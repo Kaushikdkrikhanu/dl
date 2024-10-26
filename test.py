@@ -32,6 +32,16 @@ problem_prompt = [
     }
 ]
 
+
+def print_memory_stats():
+    allocated_memory = torch.cuda.memory_allocated() / (1024 ** 3)  # Convert to GB
+    reserved_memory = torch.cuda.memory_reserved() / (1024 ** 3)    # Convert to GB
+    free_memory = reserved_memory - allocated_memory
+
+    print(f"Allocated Memory: {allocated_memory:.2f} GB")
+    print(f"Reserved Memory: {reserved_memory:.2f} GB")
+    print(f"Free Memory: {free_memory:.2f} GB")
+
 # Combine prompts into a single input for the model
 def run(system_prompt, user_prompt): 
     full_prompt = system_prompt + user_prompt
@@ -39,14 +49,23 @@ def run(system_prompt, user_prompt):
     # Tokenize the combined prompt using the chat template and move it to the GPU
     tokenized_prompt = tokenizer.apply_chat_template(full_prompt, add_generation_prompt=True, return_dict=True, return_tensors="pt").to(device)
 
-    # Generate output from the model with default settings
-    out = model.generate(
-        **tokenized_prompt,
-        max_new_tokens=512  # You can adjust max tokens for response length, but other parameters will be default
-    )
+    # Use no_grad to prevent memory accumulation from gradient tracking
+    with torch.no_grad():
+        # Generate output from the model
+        out = model.generate(
+            **tokenized_prompt,
+            max_new_tokens=512
+        )
 
     # Decode and print the generated response
     generated_text = tokenizer.decode(out[0], skip_special_tokens=True)
+ 
+    #attempt to clear memory
+    del tokenized_prompt, out
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    print_memory_stats()
     return generated_text
 
 
@@ -121,8 +140,8 @@ def save_answers_to_file(oracle_answers, first_answers, second_answers, output_f
 
 # Iterate over all files in the directory
 for filename in os.listdir(directory_path):
-    gc.collect()  # These commands help you when you face CUDA OOM error
-    torch.cuda.empty_cache()
+    # gc.collect()  # These commands help you when you face CUDA OOM error
+    # torch.cuda.empty_cache()
     
     if filename.endswith(".json"):  # Check if the file is a JSON file
         file_path = os.path.join(directory_path, filename)
