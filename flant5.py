@@ -21,7 +21,7 @@ problem_prompt = "Simplify the following expression:\n1/5 ⋅ 2/7 ÷ 12/20."
 # Define function to run the prompt through the model
 def run(prompt):
     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    outputs = model.generate(input_ids, max_new_tokens=8192)
+    outputs = model.generate(input_ids, max_new_tokens=2048)
     text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     print(text)
     return text

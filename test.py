@@ -54,7 +54,7 @@ def run(system_prompt, user_prompt):
         # Generate output from the model
         out = model.generate(
             **tokenized_prompt,
-            max_new_tokens=8192
+            max_new_tokens=2048
         )
 
     # Decode and print the generated response

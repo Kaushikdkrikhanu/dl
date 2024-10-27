@@ -44,7 +44,7 @@ def run(system_prompt, user_prompt):
     )
     out = pipe(
         full_prompt,
-        max_new_tokens=8192,
+        max_new_tokens=2048,
     )
     text = out[0]["generated_text"][-1]['content']
     # print('what',text)
