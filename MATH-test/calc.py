@@ -16,9 +16,22 @@ def calculate_accuracy(data):
     print("\nQuestions where both answers were incorrect:")
     for i, pair in enumerate(data['answer_pairs'], 1):
         if not pair['first_answer_correct'] and not pair['second_answer_correct']:
-            print(f"Question {i}")
+            # print(f"Question {i}")
+            pass
 
 # Read and parse the JSON file
+# with open('answer_pairs_1b_126_t1_8percent.json', 'r') as f:
+#     data = json.load(f)
+# calculate_accuracy(data)
+
+# with open('answer_pairs_8b_18_t1_18percent.json', 'r') as f:
+#     data = json.load(f)
+
+# calculate_accuracy(data)
+
+# with open('answer_pairs_mathstral_50_t1_39percent.json', 'r') as f:
+#     data = json.load(f)
+
 with open('answer_pairs.json', 'r') as f:
     data = json.load(f)
 
