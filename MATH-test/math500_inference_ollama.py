@@ -19,20 +19,20 @@ zero_shot_prompt = [
         "content": (
             "You are a math expert. When you respond, respond only with the Solution of the final Problem, thinking "
             "step by step. At the end of the Solution, when you give your final answer, write it in the form "
-            "'Final Answer: The final answer is $answer$. I hope it is correct.'"
+            "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
         )
     }
 ]
 
-problem_prompt = [
-    {
-        "role": "user",
-        "content": (
-            "Simplify the following expression:\n"
-            "1/5 ⋅ 2/7 ÷ 12/20."
-        )
-    }
-]
+# problem_prompt = [
+#     {
+#         "role": "user",
+#         "content": (
+#             "Simplify the following expression:\n"
+#             "1/5 ⋅ 2/7 ÷ 12/20."
+#         )
+#     }
+# ]
 
 # Combine prompts into a single input for the model
 def run(system_prompt, user_prompt):
@@ -141,7 +141,7 @@ def save_answers_to_file_unique(oracle_answers, first_answers, second_answers, o
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=4)
 
-def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file):
+def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file, json_data):
     if os.path.exists(output_file):
         with open(output_file, 'r') as f:
             data = json.load(f)
@@ -155,8 +155,17 @@ def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file
     first_single = extract_answer(first_answer)
     second_single = extract_answer(second_answer)
     
-    # Create a new answer pair object with correctness flags
+    # Create a new answer pair object with all fields
     answer_pair = {
+        # Original problem data
+        "problem": json_data['problem'],
+        "solution": json_data['solution'],
+        "answer": json_data['answer'],
+        "subject": json_data['subject'],
+        "level": json_data['level'],
+        "unique_id": json_data['unique_id'],
+        
+        # Model responses and evaluation
         "oracle_answer": oracle_answer,
         "first_answer": first_answer,
         "second_answer": second_answer,
@@ -171,14 +180,19 @@ def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=4)
 
+import time
 # Iterate over all files in the directory
 with open(directory_path, 'r') as f:
     for i, line in enumerate(f):
+        if i<205:
+            continue
         if not line.strip():  # Skip empty lines
             continue
             
         print(i)
         
+        start_time = time.time()
+
         # Parse the JSON line
         json_data = json.loads(line)
         problem_prompt = [
@@ -193,6 +207,10 @@ with open(directory_path, 'r') as f:
     
         model_answer = run(zero_shot_prompt, problem_prompt)
         model_single_answer = extract_answer(model_answer)
+
+        elapsed_time = time.time() - start_time
+        if elapsed_time > 60:  # 60 seconds = 1 minute
+            print(f"Warning: Inference {i} took {elapsed_time:.2f} seconds (more than 1 minute)")
         
         # Append the answers
         first_answer = model_answer
@@ -225,6 +243,5 @@ with open(directory_path, 'r') as f:
         second_answer = model_self_corrected_answer
 
         # Save the answers to the file after processing each JSON file
-        save_answers_to_file(oracle_answer, first_answer, second_answer, output_file)
-            
+        save_answers_to_file(oracle_answer, first_answer, second_answer, output_file, json_data)
 
