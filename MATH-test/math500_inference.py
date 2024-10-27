@@ -17,7 +17,7 @@ zero_shot_prompt = [
         "content": (
             "You are a math expert. When you respond, respond only with the Solution of the final Problem, thinking "
             "step by step. At the end of the Solution, when you give your final answer, write it in the form "
-            "'Final Answer: The final answer is $answer$. I hope it is correct.'"
+            "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
         )
     }
 ]
