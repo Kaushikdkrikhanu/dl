@@ -118,7 +118,7 @@ torch.cuda.empty_cache()
 directory_path = "test.jsonl"
 
 # File where answers will be stored
-output_file = "answer_pairs.json" 
+output_file = "self_refine_answer_pairs.json" 
 
 # Initialize counters and answer lists
 count = 0
