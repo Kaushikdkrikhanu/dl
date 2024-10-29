@@ -34,6 +34,22 @@ zero_shot_prompt = [
 #     }
 # ]
 
+# review_prompt = f"""Review the following solution to this math problem:
+#         Question: {question}
+#         Solution: {current_solution}
+        
+#         Please identify any errors or areas for improvement. Be specific about:
+#         1. Calculation errors
+#         2. Logical flaws
+#         3. Missing steps
+#         4. Unclear explanations
+        
+#         Return your review as: correct (True/False) and feedback (specific issues found)"""
+        
+# self_refine_prompt = f"""
+#                 Provide a solution to the problem considering the feedback.
+#                 """
+
 # Combine prompts into a single input for the model
 def run(system_prompt, user_prompt):
     # Combine all messages into a single conversation
@@ -102,7 +118,7 @@ torch.cuda.empty_cache()
 directory_path = "test.jsonl"
 
 # File where answers will be stored
-output_file = "answer_pairs_ishita_test.json" 
+output_file = "answer_pairs.json" 
 
 # Initialize counters and answer lists
 count = 0
@@ -188,12 +204,10 @@ with open(directory_path, 'r') as f:
             continue
         if not line.strip():  # Skip empty lines
             continue
-            
-        print(i)
+        
+        print(f"Processing entry {i}")
         
         start_time = time.time()
-
-        # Parse the JSON line
         json_data = json.loads(line)
         problem_prompt = [
             {
@@ -205,43 +219,72 @@ with open(directory_path, 'r') as f:
         oracle_answer = json_data['solution']
         oracle_single_answer = extract_answer(oracle_answer)
     
-        model_answer = run(zero_shot_prompt, problem_prompt)
-        model_single_answer = extract_answer(model_answer)
+        # model_answer = run(zero_shot_prompt, problem_prompt)
+        # model_single_answer = extract_answer(model_answer)
+        
+        # Initial answer generation
+        first_answer = run(zero_shot_prompt, problem_prompt)
+        first_single_answer = extract_answer(first_answer)
+        if oracle_single_answer == first_single_answer:
+            correct1 += 1
+        print(f"Initial accuracy: {correct1 / (i + 1):.2f}")
 
-        elapsed_time = time.time() - start_time
-        if elapsed_time > 60:  # 60 seconds = 1 minute
-            print(f"Warning: Inference {i} took {elapsed_time:.2f} seconds (more than 1 minute)")
+        # Feedback generation
+        feedback_prompt = [
+            {"role": "user", "content": problem_prompt},
+            {"role": "assistant", "content": first_answer},
+            {"role": "user", "content": "Provide feedback on the solution above in terms of calculation errors, logical flaws, or missing steps."}
+        ]
+        feedback = run(zero_shot_prompt, feedback_prompt)
+        
+        
+        # Self-correction with feedback
+        # correction_prompt = problem_prompt +  [{"role": "assistant", "content": feedback}]
+        self_refine_prompt = [ {"role" : "user", 
+                         "content" : "Given the feedback on your initial solution, please revise your answer to correct any errors or fill in any missing steps. "
+                                     "Ensure that the revised answer is accurate and follows a clear step-by-step approach to arrive at the final solution. "
+                                     "Provide your final answer in the form: 'Final Answer: The final answer is \\boxed{answer}.'"}]
+        correction_prompt = feedback_prompt + [{"role": "assistant", "content": feedback}]  + self_refine_prompt
+        second_answer = run(zero_shot_prompt, correction_prompt)
+        second_single_answer = extract_answer(second_answer)
+        if oracle_single_answer == second_single_answer:
+            correct2 += 1
+        print(f"Self-corrected accuracy: {correct2 / (i + 1):.2f}")
+        
         
         # Append the answers
-        first_answer = model_answer
+        # first_answer = model_answer
 
-        count += 1
-        if oracle_single_answer == model_single_answer:
-            correct1 += 1
+        # count += 1
+        # if oracle_single_answer == model_single_answer:
+        #     correct1 += 1
 
-        print(f"Accuracy1: {correct1/count:.2f}")
+        # print(f"Accuracy1: {correct1/count:.2f}")
 
         # Self-correction process
-        self_correction_text = 'There might be an error in the solution above...'
+        # self_correction_text = 'There might be an error in the solution above...'
+        # model_answer_prompt = [
+        #     {
+        #             "role": "assistant",
+        #             "content": (model_answer)
+        #         }
+        #     ]
 
-        model_answer_prompt = [
-            {
-                    "role": "assistant",
-                    "content": (model_answer)
-                }
-            ]
+        # self_correction_prompt = [
+        #         {
+        #             "role": "user",
+        #             "content": (self_correction_text)
+        #         }
+        #     ]
 
-        self_correction_prompt = [
-                {
-                    "role": "user",
-                    "content": (self_correction_text)
-                }
-            ]
-
-        model_self_corrected_answer = run(zero_shot_prompt+problem_prompt+model_answer_prompt, self_correction_prompt)
-
-        second_answer = model_self_corrected_answer
+        # model_self_corrected_answer = run(zero_shot_prompt+problem_prompt+model_answer_prompt, self_correction_prompt)
+        # second_answer = model_self_corrected_answer
 
         # Save the answers to the file after processing each JSON file
         save_answers_to_file(oracle_answer, first_answer, second_answer, output_file, json_data)
+        
+        elapsed_time = time.time() - start_time
+        if elapsed_time > 60:  # 60 seconds = 1 minute
+            print(f"Warning: Inference {i} took {elapsed_time:.2f} seconds (more than 1 minute)")
+            
 
