@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
-from langchain_ollama.llms import OllamaLLM
+from langchain_community.llms import Ollama
 import re
 import os
 import json
@@ -68,7 +68,7 @@ def run(system_prompt, user_prompt):
             full_prompt += f"Assistant: {message['content']}\n"
 
     # Initialize Ollama
-    llm = OllamaLLM(model="llama3.2:1b")  # or whatever model you have pulled in Ollama
+    llm = Ollama(model="llama3.2:1b")  # or whatever model you have pulled in Ollama
     
     # Get response from Ollama
     response = llm.invoke(full_prompt)
@@ -201,8 +201,8 @@ import time
 # Iterate over all files in the directory
 with open(directory_path, 'r') as f:
     for i, line in enumerate(f):
-        if i<205:
-            continue
+        # if i<205:
+        #     continue
         if not line.strip():  # Skip empty lines
             continue
         
