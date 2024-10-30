@@ -1,10 +1,15 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
-from langchain_community.llms import Ollama
+from langchain_ollama.llms import OllamaLLM
+import re
+import os
+import json
+import gc
+import torch
 
 
 # Define the checkpoint for the Mathstral model
-checkpoint = "meta-llama/Llama-3.2-1B-Instruct"
+# checkpoint = "meta-llama/Llama-3.2-1B-Instruct"
 
 # Set device to GPU (CUDA) if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -63,7 +68,7 @@ def run(system_prompt, user_prompt):
             full_prompt += f"Assistant: {message['content']}\n"
 
     # Initialize Ollama
-    llm = Ollama(model="llama3.2:1b")  # or whatever model you have pulled in Ollama
+    llm = OllamaLLM(model="llama3.2:1b")  # or whatever model you have pulled in Ollama
     
     # Get response from Ollama
     response = llm.invoke(full_prompt)
@@ -72,8 +77,6 @@ def run(system_prompt, user_prompt):
 
 
 # !tar -xvf MATH.tar
-
-import re
 
 def extract_answer(text):
     """
@@ -97,6 +100,8 @@ def extract_answer(text):
     else:
         return None
 
+
+##########################################
 # Example usage:
 text = "adasbda boxed{answer} asdasda"
 answer = extract_answer(text)
@@ -105,11 +110,7 @@ if answer:
 else:
     print("No match found")
 
-
-import os
-import json
-import gc
-import torch
+############################################
 
 gc.collect()  # These commands help you when you face CUDA OOM error
 torch.cuda.empty_cache()
@@ -286,5 +287,3 @@ with open(directory_path, 'r') as f:
         elapsed_time = time.time() - start_time
         if elapsed_time > 60:  # 60 seconds = 1 minute
             print(f"Warning: Inference {i} took {elapsed_time:.2f} seconds (more than 1 minute)")
-            
-
