@@ -528,13 +528,13 @@ class SCoReTrainer:
         logger.info(f"Correct answer (raw):\n{correct}")
         try:
             # Extract answer from \boxed{} format
-            def extract_boxed_answer(text: str) -> Optional[str]:
+            def extract_boxed_answer(text: str) -> str:
                 import re
                 pattern = r'\\boxed{([^}]*)}'
                 match = re.search(pattern, text)
                 if match:
                     return match.group(1).strip()
-                return None  # Return None if no boxed answer found  # Return full text if no boxed answer found
+                return text.strip()  # Return full text if no boxed answer found
 
             # Clean and extract answers
             generated_ans = extract_boxed_answer(generated)
@@ -543,10 +543,6 @@ class SCoReTrainer:
             logger.info(f"After boxed extraction:")
             logger.info(f"Generated: {generated_ans}")
             logger.info(f"Correct: {correct_ans}")
-
-            if generated_ans is None or correct_ans is None:
-                logger.info("No boxed answer found in either generated or correct answer")
-                return 0.0, 0.0, {'f': 0.0}
 
             # Clean the answers
             for char in [' ', '$', '\\n', '\\', '{', '}']:
