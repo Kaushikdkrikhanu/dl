@@ -1,0 +1,15 @@
+[
+  {
+      "problem": "Convert the point $(0,3)$ in rectangular coordinates to polar coordinates.  Enter your answer in the form $(r,\\theta),$ where $r > 0$ and $0 \\le \\theta < 2 \\pi.$",
+      "solution": "We have that $r = \\sqrt{0^2 + 3^2} = 3.$  Also, if we draw the line connecting the origin and $(0,3),$ this line makes an angle of $\\frac{\\pi}{2}$ with the positive $x$-axis.\n\n[asy]\nunitsize(0.8 cm);\n\ndraw((-0.5,0)--(3.5,0));\ndraw((0,-0.5)--(0,3.5));\ndraw(arc((0,0),3,0,90),red,Arrow(6));\n\ndot((0,3), red);\nlabel(\"$(0,3)$\", (0,3), W);\ndot((3,0), red);\n[/asy]\n\nTherefore, the polar coordinates are $\\boxed{\\left( 3, \\frac{\\pi}{2} \\right)}.$",
+      "answer": "\\left( 3, \\frac{\\pi}{2} \\right)",
+      "subject": "Precalculus",
+      "level": 2,
+      "unique_id": "test/precalculus/807.json",
+      "oracle_answer": "We have that $r = \\sqrt{0^2 + 3^2} = 3.$  Also, if we draw the line connecting the origin and $(0,3),$ this line makes an angle of $\\frac{\\pi}{2}$ with the positive $x$-axis.\n\n[asy]\nunitsize(0.8 cm);\n\ndraw((-0.5,0)--(3.5,0));\ndraw((0,-0.5)--(0,3.5));\ndraw(arc((0,0),3,0,90),red,Arrow(6));\n\ndot((0,3), red);\nlabel(\"$(0,3)$\", (0,3), W);\ndot((3,0), red);\n[/asy]\n\nTherefore, the polar coordinates are $\\boxed{\\left( 3, \\frac{\\pi}{2} \\right)}.$",
+      "first_answer": "To convert the given point (0,3) from rectangular coordinates to polar coordinates, we need to find the radius 'r' and angle '\u03b8'.\n\nWe know that for a point (x,y), its corresponding polar coordinates are given by:\n\nr = \u221a(x^2 + y^2)\n\u03b8 = arctan(y/x)\n\nHere, x = 0 and y = 3.\n\nSubstituting these values in the above equations, we get:\n\nr = \u221a(0^2 + 3^2) = \u221a9 = 3\n\u03b8 = arctan(3/0)\n= \u03c0/2\n\nTherefore, the polar coordinates of (0,3) are (\u221a9,\\frac{\\pi}{2}).",
+      "second_answer": "Final Answer: The final answer is $\\boxed{(\\sqrt{9},\\frac{\\pi}{2})}$.",
+      "first_answer_correct": false,
+      "second_answer_correct": false
+  }
+]
