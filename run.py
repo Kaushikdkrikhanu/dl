@@ -556,7 +556,7 @@ class SCoReTrainer:
             logger.info(f"Generated: {generated_ans}")
             logger.info(f"Correct: {correct_ans}")
 
-            if generated_ans is None or correct_ans is None:
+            if generated_ans is None:
                 logger.info("No boxed answer found in either generated or correct answer")
                 return 0.0, 0.0, {'f': 0.0}
 
