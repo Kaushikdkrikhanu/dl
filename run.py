@@ -531,11 +531,22 @@ class SCoReTrainer:
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
                 import re
-                pattern = r'\\boxed{([^}]*)}'
+                # More flexible pattern to handle multi-line and nested braces
+                pattern = r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
                 match = re.search(pattern, text)
                 if match:
                     return match.group(1).strip()
-                return None  # Return None if no boxed answer found  # Return full text if no boxed answer found
+                # If no boxed answer found, try to extract the final answer after "Final Answer:"
+                final_answer_pattern = r'Final Answer:.*?\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
+                final_match = re.search(final_answer_pattern, text, re.DOTALL)
+                if final_match:
+                    return final_match.group(1).strip()
+                # If still no match, look for any mathematical expression
+                math_pattern = r'\\left\((.*?)\\'
+                math_match = re.search(math_pattern, text)
+                if math_match:
+                    return math_match.group(1).strip()
+                return None  # Return None if no patterns match
 
             # Clean and extract answers
             generated_ans = extract_boxed_answer(generated)
