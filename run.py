@@ -525,6 +525,30 @@ class SCoReTrainer:
         rouge = {}
 
         logger.info(f"\n=== Math Reward Computation ===")
+        trace_info = {
+            "generated_answer": {
+                "raw": generated,
+                "boxed": None,
+                "cleaned": None,
+                "parsed_expr": None
+            },
+            "correct_answer": {
+                "raw": correct,
+                "boxed": None,
+                "cleaned": None,
+                "parsed_expr": None
+            },
+            "reward_computation": {
+                "method_used": None,
+                "final_reward": 0.0,
+                "comparison_result": None,
+                "error": None
+            },
+            "metrics": {
+                    "bleu": 0.0,
+                    "rouge": {}
+                }
+        }
         try:
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
@@ -544,7 +568,7 @@ class SCoReTrainer:
                 math_match = re.search(math_pattern, text)
                 if math_match:
                     return math_match.group(1).strip()
-                return text.strip()
+                return None
 
             # Clean and extract answers
             generated_ans = extract_boxed_answer(generated)
@@ -570,6 +594,9 @@ class SCoReTrainer:
             logger.info(f"Generated: {generated_ans}")
             logger.info(f"Correct: {correct_ans}")
 
+            trace_info["generated_answer"]["cleaned"] = generated_ans
+            trace_info["correct_answer"]["cleaned"] = correct_ans
+
             # Try parsing expressions
             try:
                 logger.info("Attempting to parse mathematical expressions...")
@@ -581,11 +608,19 @@ class SCoReTrainer:
                 difference = simplify(gen_expr - cor_expr)
                 logger.info(f"Simplified difference: {difference}")
                 
+                trace_info["generated_answer"]["parsed_expr"] = str(gen_expr)
+                trace_info["correct_answer"]["parsed_expr"] = str(cor_expr)
+                trace_info["reward_computation"]["method_used"] = "symbolic_comparison"
+                trace_info["reward_computation"]["comparison_result"] = str(difference)
+                
                 reward = 1.0 if difference == 0 else 0.0
                 logger.info(f"Expression comparison reward: {reward}")
             except (SympifyError, TypeError, ValueError) as e:
                 logger.info(f"Expression parsing failed: {str(e)}")
                 logger.info("Falling back to string comparison")
+                
+                trace_info["reward_computation"]["method_used"] = "string_comparison"
+                trace_info["reward_computation"]["error"] = str(e)
                 reward = 1.0 if generated_ans == correct_ans else 0.0
                 logger.info(f"String comparison reward: {reward}")
 
@@ -597,20 +632,25 @@ class SCoReTrainer:
                         generated.split(),
                         smoothing_function=self.smoothing.method1
                     )
+                    trace_info["metrics"]["bleu"] = bleu
                 except Exception as e:
                     logger.error(f"Error computing BLEU score: {e}")
                     bleu = 0.0
+                    trace_info["metrics"]["bleu"] = bleu
 
             # Compute ROUGE score if enabled
             if self.config.compute_rouge:
                 try:
                     rouge_scores = self.rouge.get_scores(generated, correct)[0]
                     rouge = {'f': rouge_scores.get('f', 0.0)}
+                    trace_info["metrics"]["rouge"] = rouge_scores
                 except Exception as e:
                     logger.error(f"Error computing ROUGE score: {e}")
+                    trace_info["metrics"]["rouge"] = {"error": str(e)}
                     rouge = {'f': 0.0}
 
         except Exception as e:
+            trace_info["reward_computation"]["error"] = str(e)
             logger.error(f"Error in reward computation: {e}")
             reward = 0.0
             bleu = 0.0
@@ -621,8 +661,23 @@ class SCoReTrainer:
         logger.info(f"BLEU: {bleu}")
         logger.info(f"ROUGE: {rouge}")
         logger.info("===========================\n")   
-
+        self._save_trace(trace_info)
         return reward, bleu, rouge
+
+    def _save_trace(self, trace_info: Dict) -> None:
+        """
+        Save trace information to a JSON file with pretty printing.
+        """
+        try:
+            trace_file = os.path.join(self.config.output_dir, 'reward_traces.jsonl')
+            with open(trace_file, 'a') as f:
+                # Pretty print the JSON with indentation
+                json_str = json.dumps(trace_info, indent=2)
+                # Add a newline after each JSON object
+                f.write(json_str + '\n\n')
+        except Exception as e:
+            logger.error(f"Error saving trace information: {e}")
+
     def safe_execute_code(self, code: str, test: str, timeout: int = 5) -> bool:
         """
         Safely execute generated code with a test case.
