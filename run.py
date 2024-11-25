@@ -525,8 +525,6 @@ class SCoReTrainer:
         rouge = {}
 
         logger.info(f"\n=== Math Reward Computation ===")
-        logger.info(f"Generated answer (raw):\n{generated}")
-        logger.info(f"Correct answer (raw):\n{correct}")
         try:
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
@@ -546,7 +544,7 @@ class SCoReTrainer:
                 math_match = re.search(math_pattern, text)
                 if math_match:
                     return math_match.group(1).strip()
-                return None  # Return None if no patterns match
+                return text.strip()
 
             # Clean and extract answers
             generated_ans = extract_boxed_answer(generated)
