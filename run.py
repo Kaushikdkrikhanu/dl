@@ -557,7 +557,7 @@ class SCoReTrainer:
             logger.info(f"Correct: {correct_ans}")
 
             if generated_ans is None:
-                logger.info("No boxed answer found in either generated or correct answer")
+                logger.info("No boxed answer found in either generated answer")
                 return 0.0, 0.0, {'f': 0.0}
 
             # Clean the answers
