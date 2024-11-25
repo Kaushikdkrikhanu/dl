@@ -845,7 +845,7 @@ class SCoReTrainer:
                 else:
                     # Handle case where batch is a list
                     problem = [item['problem'] for item in batch]
-                    correct = [item['answer'] for item in batch]
+                    correct = [item['solution'] for item in batch]
                     
                 if turn == 1:
                     inputs = get_math_first_turn_prompt(problem) if isinstance(problem, str) else [get_math_first_turn_prompt(p) for p in problem]
