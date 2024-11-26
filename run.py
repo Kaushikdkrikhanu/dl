@@ -217,9 +217,13 @@ class BaseDataset(Dataset):
                 return get_math_first_turn_prompt(item['problem'])
             else:
                 return get_math_correction_prompt(item['problem'], prev_attempt)
+        elif self.task == 'CODE':
+            if turn == 1:
+                return get_code_first_turn_prompt(item.get('text', item.get('prompt', '')))
+            else:
+                return get_code_correction_prompt(item.get('text', item.get('prompt', '')), prev_attempt)
         else:
-            # Handle other tasks like CODE similarly
-            raise NotImplementedError("Only MATH task is implemented")
+            raise NotImplementedError(f"Task {self.task} is not implemented")
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         try:
@@ -1227,7 +1231,7 @@ class SCoReTrainer:
                             "reward_loss": -(total_rewards.mean().item()),
                             "rewards_t1": first_rewards,
                             "rewards_t2": second_rewards,
-                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first, second)]
+                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]  # Fixed variable names
                         }
 
                         # Add task-specific metrics
