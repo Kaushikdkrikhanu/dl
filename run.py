@@ -1517,8 +1517,8 @@ def main():
         elif config.task == 'CODE':
             train_data = load_json(train_file, 1000)
             val_data = load_json(val_file, 100)
-        train_dataset = BaseDataset(train_data)
-        val_dataset = BaseDataset(val_data)
+        train_dataset = BaseDataset(train_data, task=config.task) 
+        val_dataset = BaseDataset(val_data, task=config.task)  
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
