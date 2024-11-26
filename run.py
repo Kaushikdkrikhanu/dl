@@ -151,6 +151,47 @@ def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
         "Please provide a corrected solution.</|user|>\n"
         "<|assistant|>"
     )
+
+
+def get_code_first_turn_prompt(problem: str) -> str:
+    """Generate the first turn prompt for code problems.
+    
+    Args:
+        problem (str): Problem description including function signature and test cases
+        
+    Returns:
+        str: Formatted prompt for first attempt
+    """
+    return (
+        "<|system|>You are an expert Python programmer. When you respond, respond only with the complete "
+        "working solution to solve the problem while passing all test cases. Do not include any explanations - "
+        "only provide the solution code.</|system|>\n"
+        f"<|user|>{problem}</|user|>\n"
+        "<|assistant|>"
+    )
+
+def get_code_correction_prompt(problem: str, prev_attempt: str) -> str:
+    """Generate the self-correction prompt for code problems.
+    
+    Args:
+        problem (str): Original problem description including function signature and test cases 
+        prev_attempt (str): Previous code attempt to be corrected
+        
+    Returns:
+        str: Formatted prompt for correction attempt
+    """
+    return (
+        "<|system|>You are an expert Python programmer. There might be an error in the code solution below "
+        "because of lack of understanding of the question. Please carefully analyze the code, identify any issues, "
+        "and provide a corrected version that passes all test cases. Only output the corrected code solution - "
+        "do not include any explanations.</|system|>\n"
+        f"<|user|>Problem:\n{problem}\n\n"
+        f"Previous solution:\n{prev_attempt}\n\n"
+        "Please provide a corrected solution.</|user|>\n"
+        "<|assistant|>"
+    )
+
+
 class BaseDataset(Dataset):
     """
     Base dataset class for loading data.
@@ -852,9 +893,23 @@ class SCoReTrainer:
                 else:
                     inputs = get_math_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_math_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
                 tests = None
+            elif self.task == 'CODE':
+                if isinstance(batch, dict):
+                    problem = batch.get('text', batch.get('prompt', ''))
+                    correct = batch.get('code', batch.get('canonical_solution', ''))
+                    tests = batch.get('test_list', batch.get('test', ''))
+                else:
+                    problem = [item.get('text', item.get('prompt', '')) for item in batch]
+                    correct = [item.get('code', item.get('canonical_solution', '')) for item in batch]
+                    tests = [item.get('test_list', item.get('test', '')) for item in batch]
+                
+                if turn == 1:
+                    inputs = get_code_first_turn_prompt(problem) if isinstance(problem, str) else [get_code_first_turn_prompt(p) for p in problem]
+                else:
+                    inputs = get_code_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_code_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
             else:
                 # Handle other tasks
-                raise NotImplementedError("Only MATH task is implemented")
+                raise NotImplementedError("Not implemented for this task")
                 
             logger.debug(f"Batch prepared with {len(inputs)} samples.")
             return inputs, correct, tests
