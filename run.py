@@ -30,6 +30,7 @@ import radon.complexity as radon_complexity
 from sympy import simplify, SympifyError
 from sympy.parsing.sympy_parser import parse_expr
 import ast
+import wandb
 
 # Initialize NLTK
 try:
@@ -40,7 +41,7 @@ except LookupError:
 
 # Configure logging
 logging.basicConfig(
-    level='INFO',
+    level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
@@ -151,6 +152,43 @@ def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
         "Please provide a corrected solution.</|user|>\n"
         "<|assistant|>"
     )
+
+
+def get_code_first_turn_prompt(problem: str) -> str:
+    """Generate the first turn prompt for code problems.
+    
+    Args:
+        problem (str): Problem description including function signature and test cases
+        
+    Returns:
+        str: Formatted prompt for first attempt
+    """
+    return (
+        "<|system|>You are an expert Python programmer, and here is your task:</|system|>\n"
+        f"<|user|>{problem}</|user|>\n"
+        "<|assistant|>"
+    )
+
+def get_code_correction_prompt(problem: str, prev_attempt: str) -> str:
+    """Generate the self-correction prompt for code problems.
+    
+    Args:
+        problem (str): Original problem description including function signature and test cases 
+        prev_attempt (str): Previous code attempt to be corrected
+        
+    Returns:
+        str: Formatted prompt for correction attempt
+    """
+    return (
+        "<|system|>There might be an error in the code above because of lack of understanding of the question. Please correct the "
+        "error, if any, and rewrite the solution. Only output the final correct Python program!</|system|>\n"
+        f"<|user|>Problem:\n{problem}\n\n"
+        f"Previous solution:\n{prev_attempt}\n\n"
+        "Please provide a corrected solution.</|user|>\n"
+        "<|assistant|>"
+    )
+
+
 class BaseDataset(Dataset):
     """
     Base dataset class for loading data.
@@ -179,9 +217,13 @@ class BaseDataset(Dataset):
                 return get_math_first_turn_prompt(item['problem'])
             else:
                 return get_math_correction_prompt(item['problem'], prev_attempt)
+        elif self.task == 'CODE':
+            if turn == 1:
+                return get_code_first_turn_prompt(item.get('text', item.get('prompt', '')))
+            else:
+                return get_code_correction_prompt(item.get('text', item.get('prompt', '')), prev_attempt)
         else:
-            # Handle other tasks like CODE similarly
-            raise NotImplementedError("Only MATH task is implemented")
+            raise NotImplementedError(f"Task {self.task} is not implemented")
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         try:
@@ -484,9 +526,32 @@ class SCoReTrainer:
         self.reward_history: List[float] = []
         self.edit_distance_ratios: List[float] = []
         self.scaler = torch.cuda.amp.GradScaler(enabled=config.mixed_precision and torch.cuda.is_available())
+        self.use_wandb = False
+        
         if config.task == 'MATH':
             self.rouge = Rouge()
             self.smoothing = SmoothingFunction()
+
+
+        try:
+            wandb.login(key="5846629ab2a2094c5948b4c032301fdae772fbb0", relogin=True) 
+            wandb.init(
+                project="score-training",
+                config={
+                    "task": config.task,
+                    "model_variant": config.model_variant,
+                    "batch_size": config.batch_size,
+                    "learning_rate": config.learning_rate,
+                    "beta_1": config.beta_1,
+                    "beta_2": config.beta_2,
+                    "alpha": config.alpha
+                }
+            )
+            self.use_wandb = True
+            logger.info("Weights & Biases initialized successfully.")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Weights & Biases: {e}")
+            self.use_wandb = False
 
     def compute_kl_divergence(self, logits: torch.Tensor, ref_logits: torch.Tensor) -> torch.Tensor:
         """
@@ -525,17 +590,50 @@ class SCoReTrainer:
         rouge = {}
 
         logger.info(f"\n=== Math Reward Computation ===")
-        logger.info(f"Generated answer (raw):\n{generated}")
-        logger.info(f"Correct answer (raw):\n{correct}")
+        trace_info = {
+            "generated_answer": {
+                "raw": generated,
+                "boxed": None,
+                "cleaned": None,
+                "parsed_expr": None
+            },
+            "correct_answer": {
+                "raw": correct,
+                "boxed": None,
+                "cleaned": None,
+                "parsed_expr": None
+            },
+            "reward_computation": {
+                "method_used": None,
+                "final_reward": 0.0,
+                "comparison_result": None,
+                "error": None
+            },
+            "metrics": {
+                    "bleu": 0.0,
+                    "rouge": {}
+                }
+        }
         try:
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
                 import re
-                pattern = r'\\boxed{([^}]*)}'
+                # More flexible pattern to handle multi-line and nested braces
+                pattern = r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
                 match = re.search(pattern, text)
                 if match:
                     return match.group(1).strip()
-                return None  # Return None if no boxed answer found  # Return full text if no boxed answer found
+                # If no boxed answer found, try to extract the final answer after "Final Answer:"
+                final_answer_pattern = r'Final Answer:.*?\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
+                final_match = re.search(final_answer_pattern, text, re.DOTALL)
+                if final_match:
+                    return final_match.group(1).strip()
+                # If still no match, look for any mathematical expression
+                math_pattern = r'\\left\((.*?)\\'
+                math_match = re.search(math_pattern, text)
+                if math_match:
+                    return math_match.group(1).strip()
+                return None
 
             # Clean and extract answers
             generated_ans = extract_boxed_answer(generated)
@@ -545,8 +643,8 @@ class SCoReTrainer:
             logger.info(f"Generated: {generated_ans}")
             logger.info(f"Correct: {correct_ans}")
 
-            if generated_ans is None or correct_ans is None:
-                logger.info("No boxed answer found in either generated or correct answer")
+            if generated_ans is None:
+                logger.info("No boxed answer found in generated answer")
                 return 0.0, 0.0, {'f': 0.0}
 
             # Clean the answers
@@ -561,6 +659,9 @@ class SCoReTrainer:
             logger.info(f"Generated: {generated_ans}")
             logger.info(f"Correct: {correct_ans}")
 
+            trace_info["generated_answer"]["cleaned"] = generated_ans
+            trace_info["correct_answer"]["cleaned"] = correct_ans
+
             # Try parsing expressions
             try:
                 logger.info("Attempting to parse mathematical expressions...")
@@ -572,11 +673,19 @@ class SCoReTrainer:
                 difference = simplify(gen_expr - cor_expr)
                 logger.info(f"Simplified difference: {difference}")
                 
+                trace_info["generated_answer"]["parsed_expr"] = str(gen_expr)
+                trace_info["correct_answer"]["parsed_expr"] = str(cor_expr)
+                trace_info["reward_computation"]["method_used"] = "symbolic_comparison"
+                trace_info["reward_computation"]["comparison_result"] = str(difference)
+                
                 reward = 1.0 if difference == 0 else 0.0
                 logger.info(f"Expression comparison reward: {reward}")
             except (SympifyError, TypeError, ValueError) as e:
                 logger.info(f"Expression parsing failed: {str(e)}")
                 logger.info("Falling back to string comparison")
+                
+                trace_info["reward_computation"]["method_used"] = "string_comparison"
+                trace_info["reward_computation"]["error"] = str(e)
                 reward = 1.0 if generated_ans == correct_ans else 0.0
                 logger.info(f"String comparison reward: {reward}")
 
@@ -588,20 +697,25 @@ class SCoReTrainer:
                         generated.split(),
                         smoothing_function=self.smoothing.method1
                     )
+                    trace_info["metrics"]["bleu"] = bleu
                 except Exception as e:
                     logger.error(f"Error computing BLEU score: {e}")
                     bleu = 0.0
+                    trace_info["metrics"]["bleu"] = bleu
 
             # Compute ROUGE score if enabled
             if self.config.compute_rouge:
                 try:
                     rouge_scores = self.rouge.get_scores(generated, correct)[0]
                     rouge = {'f': rouge_scores.get('f', 0.0)}
+                    trace_info["metrics"]["rouge"] = rouge_scores
                 except Exception as e:
                     logger.error(f"Error computing ROUGE score: {e}")
+                    trace_info["metrics"]["rouge"] = {"error": str(e)}
                     rouge = {'f': 0.0}
 
         except Exception as e:
+            trace_info["reward_computation"]["error"] = str(e)
             logger.error(f"Error in reward computation: {e}")
             reward = 0.0
             bleu = 0.0
@@ -612,8 +726,23 @@ class SCoReTrainer:
         logger.info(f"BLEU: {bleu}")
         logger.info(f"ROUGE: {rouge}")
         logger.info("===========================\n")   
-
+        self._save_trace(trace_info)
         return reward, bleu, rouge
+
+    def _save_trace(self, trace_info: Dict) -> None:
+        """
+        Save trace information to a JSON file with pretty printing.
+        """
+        try:
+            trace_file = os.path.join(self.config.output_dir, 'reward_traces.jsonl')
+            with open(trace_file, 'a') as f:
+                # Pretty print the JSON with indentation
+                json_str = json.dumps(trace_info, indent=2)
+                # Add a newline after each JSON object
+                f.write(json_str + '\n\n')
+        except Exception as e:
+            logger.error(f"Error saving trace information: {e}")
+
     def safe_execute_code(self, code: str, test: str, timeout: int = 5) -> bool:
         """
         Safely execute generated code with a test case.
@@ -781,16 +910,30 @@ class SCoReTrainer:
                 else:
                     # Handle case where batch is a list
                     problem = [item['problem'] for item in batch]
-                    correct = [item['answer'] for item in batch]
+                    correct = [item['solution'] for item in batch]
                     
                 if turn == 1:
                     inputs = get_math_first_turn_prompt(problem) if isinstance(problem, str) else [get_math_first_turn_prompt(p) for p in problem]
                 else:
                     inputs = get_math_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_math_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
                 tests = None
+            elif self.task == 'CODE':
+                if isinstance(batch, dict):
+                    problem = batch.get('text', batch.get('prompt', ''))
+                    correct = batch.get('code', batch.get('canonical_solution', ''))
+                    tests = batch.get('test_list', batch.get('test', ''))
+                else:
+                    problem = [item.get('text', item.get('prompt', '')) for item in batch]
+                    correct = [item.get('code', item.get('canonical_solution', '')) for item in batch]
+                    tests = [item.get('test_list', item.get('test', '')) for item in batch]
+                
+                if turn == 1:
+                    inputs = get_code_first_turn_prompt(problem) if isinstance(problem, str) else [get_code_first_turn_prompt(p) for p in problem]
+                else:
+                    inputs = get_code_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_code_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
             else:
                 # Handle other tasks
-                raise NotImplementedError("Only MATH task is implemented")
+                raise NotImplementedError("Not implemented for this task")
                 
             logger.debug(f"Batch prepared with {len(inputs)} samples.")
             return inputs, correct, tests
@@ -814,6 +957,58 @@ class SCoReTrainer:
         except Exception as e:
             logger.error(f"Error during training: {e}")
             raise
+    
+    def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
+        """Log training metrics to wandb and console."""
+        if not self.use_wandb:
+            return
+
+        try:
+            # Prepare metrics dictionary
+            wandb_metrics = {
+                # Loss components
+                "train/total_loss": metrics["total_loss"],
+                "train/kl_loss": metrics.get("kl_loss", 0.0),
+                "train/reward_loss": metrics.get("reward_loss", 0.0),
+                
+                # Rewards
+                "train/mean_reward_t1": metrics["rewards_t1"].mean().item(),
+                "train/mean_reward_t2": metrics["rewards_t2"].mean().item(),
+                "train/reward_improvement": (metrics["rewards_t2"] - metrics["rewards_t1"]).mean().item(),
+                
+                # Training dynamics
+                "train/learning_rate": self.optimizer.param_groups[0]["lr"],
+                
+                # Edit distance metrics
+                "train/edit_distance_ratio": np.mean(metrics.get("edit_distance_ratios", [0.0])),
+                
+                # Task-specific metrics
+                "train/bleu_score": np.mean(metrics.get("bleu_scores", [0.0])) if self.config.compute_bleu else None,
+                "train/rouge_score": np.mean(metrics.get("rouge_scores", [0.0])) if self.config.compute_rouge else None,
+                "train/cyclomatic_complexity": np.mean(metrics.get("cyclomatic_scores", [0.0])) if self.config.compute_cyclomatic_complexity else None
+            }
+
+            # Remove None values
+            wandb_metrics = {k: v for k, v in wandb_metrics.items() if v is not None}
+
+            # Log to wandb
+            if step is not None:
+                wandb.log(wandb_metrics, step=step)
+            else:
+                wandb.log(wandb_metrics)
+
+            # Log summary metrics to console
+            if self.global_step % self.config.logging_steps == 0:
+                logger.info(
+                    f"Step {self.global_step} - "
+                    f"Loss: {metrics['total_loss']:.4f}, "
+                    f"Reward T1: {wandb_metrics['train/mean_reward_t1']:.4f}, "
+                    f"Reward T2: {wandb_metrics['train/mean_reward_t2']:.4f}, "
+                    f"Improvement: {wandb_metrics['train/reward_improvement']:.4f}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error logging metrics to wandb: {e}")
 
     def stage_one(self) -> None:
         """
@@ -893,6 +1088,32 @@ class SCoReTrainer:
                     
                     # Total loss is negative reward for second attempt plus KL penalty on first attempt
                     loss = -rewards.mean() + kl_loss
+
+                    try:
+                        # Collect metrics
+                        metrics = {
+                            "total_loss": loss.item(),
+                            "kl_loss": kl_loss.item(),
+                            "reward_loss": -rewards.mean().item(),
+                            "rewards_t1": torch.zeros_like(rewards),  # First attempt has no rewards in Stage I
+                            "rewards_t2": rewards,
+                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]
+                        }
+
+                        # Add task-specific metrics
+                        if self.config.task == 'MATH':
+                            if self.config.compute_bleu:
+                                metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
+                            if self.config.compute_rouge:
+                                metrics["rouge_scores"] = [r.get('f', 0.0) for r in self.compute_rewards(second_responses, correct, tests)['rouge']]
+                        elif self.config.task == 'CODE' and self.config.compute_cyclomatic_complexity:
+                            metrics["cyclomatic_scores"] = self.compute_rewards(second_responses, correct, tests)['cyclomatic']
+
+                        # Log metrics
+                        self.log_metrics(metrics, step=self.global_step)
+
+                    except Exception as e:
+                        logger.error(f"Error collecting or logging metrics in Stage I: {e}")
 
             except Exception as e:
                 logger.error(f"Error during Stage I forward pass: {e}")
@@ -1002,6 +1223,34 @@ class SCoReTrainer:
                     # Final loss
                     loss = -total_rewards.mean() + kl_loss
 
+                    try:
+                        # Collect metrics
+                        metrics = {
+                            "total_loss": loss.item(),
+                            "kl_loss": kl_loss.item(),
+                            "reward_loss": -(total_rewards.mean().item()),
+                            "rewards_t1": first_rewards,
+                            "rewards_t2": second_rewards,
+                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]  # Fixed variable names
+                        }
+
+                        # Add task-specific metrics
+                        if self.config.task == 'MATH':
+                            if self.config.compute_bleu:
+                                metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
+                            if self.config.compute_rouge:
+                                metrics["rouge_scores"] = [r.get('f', 0.0) for r in 
+                                    self.compute_rewards(second_responses, correct, tests)['rouge']]
+                        elif self.config.task == 'CODE' and self.config.compute_cyclomatic_complexity:
+                            metrics["cyclomatic_scores"] = self.compute_rewards(second_responses, correct, tests)['cyclomatic']
+
+                        # Log metrics
+                        self.log_metrics(metrics, step=self.global_step)
+
+                    except Exception as e:
+                        logger.error(f"Error collecting or logging metrics in Stage II: {e}")
+
+
             except Exception as e:
                 logger.error(f"Error during Stage II forward pass: {e}")
                 continue
@@ -1032,6 +1281,15 @@ class SCoReTrainer:
                     f"Stage II - Step {self.global_step}, Loss: {loss.item():.4f}, "
                     f"Total Reward: {total_rewards.mean().item():.4f}"
                 )
+
+    def __del__(self):
+        """Cleanup wandb on deletion."""
+        if self.use_wandb:
+            try:
+                wandb.finish()
+            except Exception as e:
+                logger.error(f"Error closing wandb: {e}")
+
     def evaluate(self) -> None:
         """
         Evaluate the model on the validation set.
@@ -1259,8 +1517,8 @@ def main():
         elif config.task == 'CODE':
             train_data = load_json(train_file, 1000)
             val_data = load_json(val_file, 100)
-        train_dataset = BaseDataset(train_data)
-        val_dataset = BaseDataset(val_data)
+        train_dataset = BaseDataset(train_data, task=config.task) 
+        val_dataset = BaseDataset(val_data, task=config.task)  
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
@@ -1347,6 +1605,13 @@ def main():
     except Exception as e:
         logger.critical(f"Error saving the model: {e}")
         return
+
+    if trainer.use_wandb:
+        try:
+            wandb.finish()
+            logger.info("Wandb run finished successfully.")
+        except Exception as e:
+            logger.error(f"Error finishing wandb run: {e}")
 
 
 def load_model(model_path: str, model_variant: str, device: torch.device) -> AdvancedModel:
