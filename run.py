@@ -163,8 +163,7 @@ def get_code_first_turn_prompt(problem: str) -> str:
         str: Formatted prompt for first attempt
     """
     return (
-        "<|system|>You are an expert Python programmer, and here is your task: Write a function to find the similar elements from"
-        "the given two tuple lists. Your code should pass these tests:</|system|>\n"
+        "<|system|>You are an expert Python programmer, and here is your task:</|system|>\n"
         f"<|user|>{problem}</|user|>\n"
         "<|assistant|>"
     )
