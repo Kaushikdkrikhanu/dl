@@ -163,9 +163,8 @@ def get_code_first_turn_prompt(problem: str) -> str:
         str: Formatted prompt for first attempt
     """
     return (
-        "<|system|>You are an expert Python programmer. When you respond, respond only with the complete "
-        "working solution to solve the problem while passing all test cases. Do not include any explanations - "
-        "only provide the solution code.</|system|>\n"
+        "<|system|>You are an expert Python programmer, and here is your task: Write a function to find the similar elements from"
+        "the given two tuple lists. Your code should pass these tests:</|system|>\n"
         f"<|user|>{problem}</|user|>\n"
         "<|assistant|>"
     )
@@ -181,10 +180,8 @@ def get_code_correction_prompt(problem: str, prev_attempt: str) -> str:
         str: Formatted prompt for correction attempt
     """
     return (
-        "<|system|>You are an expert Python programmer. There might be an error in the code solution below "
-        "because of lack of understanding of the question. Please carefully analyze the code, identify any issues, "
-        "and provide a corrected version that passes all test cases. Only output the corrected code solution - "
-        "do not include any explanations.</|system|>\n"
+        "<|system|>There might be an error in the code above because of lack of understanding of the question. Please correct the "
+        "error, if any, and rewrite the solution. Only output the final correct Python program!</|system|>\n"
         f"<|user|>Problem:\n{problem}\n\n"
         f"Previous solution:\n{prev_attempt}\n\n"
         "Please provide a corrected solution.</|user|>\n"
