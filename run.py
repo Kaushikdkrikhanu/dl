@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing_extensions import TypedDict
+from peft import PeftModel, LoraConfig, get_peft_model
+
 
 import torch
 import torch.nn as nn
@@ -333,7 +335,18 @@ class AdvancedModel(nn.Module):
             logger.info("Using EOS token as PAD token.")
 
         try:
+            lora_config = LoraConfig(
+                r=8,  # Rank of the low-rank matrices
+                lora_alpha=32,  # Scaling factor
+                target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
+                lora_dropout=0.1,  # Dropout for LoRA layers
+                bias="none",  # Bias handling ("none", "all", or "lora_only")
+                task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
+            )
             self.model = LlamaForCausalLM.from_pretrained(model_name).to(device)
+
+            self.model = get_peft_model(self.model, lora_config)
+            self.model.print_trainable_parameters()
             logger.info(f"Model loaded and moved to {device}.")
         except Exception as e:
             logger.error(f"Error loading model {model_name}: {e}")
@@ -734,7 +747,7 @@ class SCoReTrainer:
         Save trace information to a JSON file with pretty printing.
         """
         try:
-            trace_file = os.path.join(self.config.output_dir, 'reward_traces.jsonl')
+            trace_file = os.path.join(self.config.output_dir, 'reward_traces2.jsonl')
             with open(trace_file, 'a') as f:
                 # Pretty print the JSON with indentation
                 json_str = json.dumps(trace_info, indent=2)
@@ -1009,6 +1022,8 @@ class SCoReTrainer:
 
         except Exception as e:
             logger.error(f"Error logging metrics to wandb: {e}")
+    
+
 
     def stage_one(self) -> None:
         """
@@ -1017,6 +1032,8 @@ class SCoReTrainer:
         """
         self.model.train()
         total_loss = 0.0
+
+        
 
         for batch in tqdm(self.train_loader, desc="Stage I Training"):
             self.global_step += 1
@@ -1494,11 +1511,11 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'selected_problems_105.json')
+        train_file = os.path.join(config.data_path, 'selected_problems_original_true.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
     elif config.task == 'CODE':
-        train_file = os.path.join(config.data_path, 'mbpp_train.json')
-        val_file = os.path.join(config.data_path, 'HumanEval.jsonl')
+        train_file = os.path.join(config.data_path, 'mbpp.jsonl')
+        val_file = os.path.join(config.data_path, 'mbpp.jsonl')
     else:
         logger.critical("Invalid task specified. Choose between 'MATH' and 'CODE'.")
         return
@@ -1522,7 +1539,7 @@ def main():
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
-            shuffle=True,
+            shuffle=False,
             num_workers=config.num_workers
         )
         val_loader = DataLoader(
