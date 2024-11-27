@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing_extensions import TypedDict
 from peft import PeftModel, LoraConfig, get_peft_model
-
+# from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from transformers import LlamaForCausalLM, LlamaTokenizer, BitsAndBytesConfig
 
 import torch
 import torch.nn as nn
@@ -82,8 +83,8 @@ class Config:
     alpha: float = 5.0
     learning_rate: float = 1e-5
     batch_size: int = 1
-    max_seq_len: int = 4096
-    max_new_tokens: int = 4096
+    max_seq_len: int = 2048
+    max_new_tokens: int = 2048
     num_epochs_stage_one: int = 1
     num_epochs_stage_two: int = 1
 
@@ -336,17 +337,37 @@ class AdvancedModel(nn.Module):
 
         try:
             lora_config = LoraConfig(
-                r=8,  # Rank of the low-rank matrices
+                r=4,  # Rank of the low-rank matrices
                 lora_alpha=32,  # Scaling factor
                 target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
                 lora_dropout=0.1,  # Dropout for LoRA layers
                 bias="none",  # Bias handling ("none", "all", or "lora_only")
                 task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
             )
-            self.model = LlamaForCausalLM.from_pretrained(model_name).to(device)
-
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,  # Enable 4-bit quantization
+                bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
+                bnb_4bit_use_double_quant=True,  # Double quantization improves accuracy
+            )
+            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto", quantization_config=bnb_config)
+            
+            # self.model = load_checkpoint_and_dispatch(
+            #     self.model, model_name, device_map="auto", offload_folder="offload"
+            # )
             self.model = get_peft_model(self.model, lora_config)
             self.model.print_trainable_parameters()
+            def count_parameters(model):
+                total_params = sum(p.numel() for p in model.parameters())
+                trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+                return total_params, trainable_params
+
+            # Get total and trainable parameters
+            total_params, trainable_params = count_parameters(self.model)
+
+            # Print results
+            print(f"Total parameters: {total_params:,}")
+            print(f"Trainable parameters: {trainable_params:,}")
+            print(f"Percentage of trainable parameters: {100 * trainable_params / total_params:.2f}%")
             logger.info(f"Model loaded and moved to {device}.")
         except Exception as e:
             logger.error(f"Error loading model {model_name}: {e}")
@@ -1511,7 +1532,7 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'selected_problems_original_true.json')
+        train_file = os.path.join(config.data_path, 'selected_problems_105_level1.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
     elif config.task == 'CODE':
         train_file = os.path.join(config.data_path, 'mbpp.jsonl')

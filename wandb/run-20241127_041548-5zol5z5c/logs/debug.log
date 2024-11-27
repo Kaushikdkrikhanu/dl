@@ -1,0 +1,26 @@
+2024-11-27 04:15:48,030 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Current SDK version is 0.18.7
+2024-11-27 04:15:48,030 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Configure stats pid to 9959
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Loading settings from /root/.config/wandb/settings
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Loading settings from /root/dl/wandb/settings
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Loading settings from environment variables: {}
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Inferring run settings from compute environment: {'program_relpath': 'run.py', 'program_abspath': '/root/dl/run.py', 'program': '/root/dl/run.py'}
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Applying login settings: {'api_key': '***REDACTED***'}
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Applying login settings: {'api_key': '***REDACTED***'}
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_setup.py:_flush():79] Applying login settings: {}
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_init.py:_log_setup():533] Logging user logs to /root/dl/wandb/run-20241127_041548-5zol5z5c/logs/debug.log
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_init.py:_log_setup():534] Logging internal logs to /root/dl/wandb/run-20241127_041548-5zol5z5c/logs/debug-internal.log
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_init.py:init():619] calling init triggers
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_init.py:init():626] wandb.init called with sweep_config: {}
+config: {'task': 'MATH', 'model_variant': 'meta-llama/Llama-3.1-8B-Instruct', 'batch_size': 1, 'learning_rate': 1e-05, 'beta_1': 0.01, 'beta_2': 0.1, 'alpha': 5.0}
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_init.py:init():669] starting backend
+2024-11-27 04:15:48,031 INFO    MainThread:9959 [wandb_init.py:init():673] sending inform_init request
+2024-11-27 04:15:48,032 INFO    MainThread:9959 [backend.py:_multiprocessing_setup():104] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2024-11-27 04:15:48,032 INFO    MainThread:9959 [wandb_init.py:init():686] backend started and connected
+2024-11-27 04:15:48,034 INFO    MainThread:9959 [wandb_init.py:init():781] updated telemetry
+2024-11-27 04:15:48,038 INFO    MainThread:9959 [wandb_init.py:init():814] communicating run to backend with 90.0 second timeout
+2024-11-27 04:15:48,462 INFO    MainThread:9959 [wandb_init.py:init():867] starting run threads in backend
+2024-11-27 04:15:48,583 INFO    MainThread:9959 [wandb_run.py:_console_start():2456] atexit reg
+2024-11-27 04:15:48,584 INFO    MainThread:9959 [wandb_run.py:_redirect():2305] redirect: wrap_raw
+2024-11-27 04:15:48,584 INFO    MainThread:9959 [wandb_run.py:_redirect():2370] Wrapping output streams.
+2024-11-27 04:15:48,584 INFO    MainThread:9959 [wandb_run.py:_redirect():2395] Redirects installed.
+2024-11-27 04:15:48,585 INFO    MainThread:9959 [wandb_init.py:init():911] run started, returning control to user process

@@ -1,0 +1,56 @@
+{
+  "os": "Linux-5.15.0-126-generic-x86_64-with-glibc2.35",
+  "python": "3.11.10",
+  "startedAt": "2024-11-27T04:15:48.032567Z",
+  "args": [
+    "--task",
+    "MATH",
+    "--model_variant",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "--data_path",
+    "./data",
+    "--output_dir",
+    "./outputs",
+    "--mixed_precision",
+    "--no_bleu",
+    "--no_rouge"
+  ],
+  "program": "/root/dl/run.py",
+  "codePath": "run.py",
+  "git": {
+    "remote": "git@github.com:Kaushikdkrikhanu/dl.git",
+    "commit": "a657ef4873bebc7482ece3785b23e8350f73fd03"
+  },
+  "email": "amarmarf@gmail.com",
+  "root": "/root/dl",
+  "host": "e36b15b7400f",
+  "username": "root",
+  "executable": "/opt/conda/bin/python",
+  "codePathLocal": "run.py",
+  "cpu_count": 96,
+  "cpu_count_logical": 96,
+  "gpu": "NVIDIA L40S",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "94489280512",
+      "used": "17447112704"
+    }
+  },
+  "memory": {
+    "total": "1081887244288"
+  },
+  "cpu": {
+    "count": 96,
+    "countLogical": 96
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA L40S",
+      "memoryTotal": "48305799168",
+      "cudaCores": 18176,
+      "architecture": "Ada"
+    }
+  ],
+  "cudaVersion": "12.4"
+}
