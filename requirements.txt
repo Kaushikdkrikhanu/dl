@@ -6,3 +6,4 @@ matplotlib
 nltk
 rouge
 radon
+peft
