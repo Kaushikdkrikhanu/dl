@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing_extensions import TypedDict
 from peft import PeftModel, LoraConfig, get_peft_model
-from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+# from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 from transformers import LlamaForCausalLM, LlamaTokenizer, BitsAndBytesConfig
 
 import torch
@@ -83,8 +83,8 @@ class Config:
     alpha: float = 5.0
     learning_rate: float = 1e-5
     batch_size: int = 1
-    max_seq_len: int = 4096
-    max_new_tokens: int = 4096
+    max_seq_len: int = 2048
+    max_new_tokens: int = 2048
     num_epochs_stage_one: int = 1
     num_epochs_stage_two: int = 1
 
@@ -1532,7 +1532,7 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'selected_problems_original_true.json')
+        train_file = os.path.join(config.data_path, 'selected_problems_105_level1.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
     elif config.task == 'CODE':
         train_file = os.path.join(config.data_path, 'mbpp.jsonl')
