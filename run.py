@@ -157,40 +157,6 @@ def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
     )
 
 
-def get_code_first_turn_prompt(problem: str) -> str:
-    """Generate the first turn prompt for code problems.
-    
-    Args:
-        problem (str): Problem description including function signature and test cases
-        
-    Returns:
-        str: Formatted prompt for first attempt
-    """
-    return (
-        "<|system|>You are an expert Python programmer, and here is your task:</|system|>\n"
-        f"<|user|>{problem}</|user|>\n"
-        "<|assistant|>"
-    )
-
-def get_code_correction_prompt(problem: str, prev_attempt: str) -> str:
-    """Generate the self-correction prompt for code problems.
-    
-    Args:
-        problem (str): Original problem description including function signature and test cases 
-        prev_attempt (str): Previous code attempt to be corrected
-        
-    Returns:
-        str: Formatted prompt for correction attempt
-    """
-    return (
-        "<|system|>There might be an error in the code above because of lack of understanding of the question. Please correct the "
-        "error, if any, and rewrite the solution. Only output the final correct Python program!</|system|>\n"
-        f"<|user|>Problem:\n{problem}\n\n"
-        f"Previous solution:\n{prev_attempt}\n\n"
-        "Please provide a corrected solution.</|user|>\n"
-        "<|assistant|>"
-    )
-
 
 class BaseDataset(Dataset):
     """
@@ -220,13 +186,6 @@ class BaseDataset(Dataset):
                 return get_math_first_turn_prompt(item['problem'])
             else:
                 return get_math_correction_prompt(item['problem'], prev_attempt)
-        elif self.task == 'CODE':
-            if turn == 1:
-                return get_code_first_turn_prompt(item.get('text', item.get('prompt', '')))
-            else:
-                return get_code_correction_prompt(item.get('text', item.get('prompt', '')), prev_attempt)
-        else:
-            raise NotImplementedError(f"Task {self.task} is not implemented")
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         try:
@@ -527,9 +486,6 @@ class RewardsDict(TypedDict):
     TypedDict for rewards and related metrics.
     """
     rewards: torch.Tensor
-    bleu: List[float]
-    rouge: List[Dict[str, float]]
-    cyclomatic: List[float]
 
 
 class SCoReTrainer:
@@ -563,7 +519,6 @@ class SCoReTrainer:
         self.use_wandb = False
         
         if config.task == 'MATH':
-            self.rouge = Rouge()
             self.smoothing = SmoothingFunction()
 
 
@@ -622,8 +577,6 @@ class SCoReTrainer:
         """
         # Initialize default values
         reward = 0.0
-        bleu = 0.0
-        rouge = {}
 
         logger.info(f"\n=== Math Reward Computation ===")
         trace_info = {
@@ -644,11 +597,7 @@ class SCoReTrainer:
                 "final_reward": 0.0,
                 "comparison_result": None,
                 "error": None
-            },
-            "metrics": {
-                    "bleu": 0.0,
-                    "rouge": {}
-                }
+            }
         }
         try:
             # Extract answer from \boxed{} format

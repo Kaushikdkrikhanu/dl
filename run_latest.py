@@ -766,45 +766,17 @@ class SCoReTrainer:
             #     reward = 1.0 if generated_ans == correct_ans else 0.0
             #     logger.info(f"String comparison reward: {reward}")
 
-            # Compute BLEU score if enabled
-            if self.config.compute_bleu:
-                try:
-                    bleu = sentence_bleu(
-                        [correct.split()],
-                        generated.split(),
-                        smoothing_function=self.smoothing.method1
-                    )
-                    trace_info["metrics"]["bleu"] = bleu
-                except Exception as e:
-                    logger.error(f"Error computing BLEU score: {e}")
-                    bleu = 0.0
-                    trace_info["metrics"]["bleu"] = bleu
-
-            # Compute ROUGE score if enabled
-            if self.config.compute_rouge:
-                try:
-                    rouge_scores = self.rouge.get_scores(generated, correct)[0]
-                    rouge = {'f': rouge_scores.get('f', 0.0)}
-                    trace_info["metrics"]["rouge"] = rouge_scores
-                except Exception as e:
-                    logger.error(f"Error computing ROUGE score: {e}")
-                    trace_info["metrics"]["rouge"] = {"error": str(e)}
-                    rouge = {'f': 0.0}
-
         except Exception as e:
             trace_info["reward_computation"]["error"] = str(e)
             logger.error(f"Error in reward computation: {e}")
             reward = 0.0
-            bleu = 0.0
-            rouge = {'f': 0.0}
+     
 
         logger.info(f"=== Final Reward Metrics ===")
         logger.info(f"Reward: {reward}")
-        logger.info(f"BLEU: {bleu}")
-        logger.info(f"ROUGE: {rouge}")
         logger.info("===========================\n")   
         self._save_trace(trace_info)
-        return reward, bleu, rouge
+        return reward
 
     def _save_trace(self, trace_info: Dict) -> None:
         """
@@ -855,44 +827,6 @@ class SCoReTrainer:
             logger.error(f"Error during code execution thread: {e}")
             return False
 
-    def compute_cyclomatic_complexity(self, code: str) -> float:
-        """
-        Compute cyclomatic complexity of the given code.
-
-        Args:
-            code (str): Code to analyze.
-
-        Returns:
-            float: Average cyclomatic complexity.
-        """
-        try:
-            complexity = radon_complexity.cc_visit(code)
-            avg_complexity = np.mean([block.complexity for block in complexity]) if complexity else 0.0
-            logger.debug(f"Cyclomatic complexity: {avg_complexity}")
-            return avg_complexity
-        except SyntaxError as e:
-            logger.warning(f"SyntaxError while computing cyclomatic complexity: {e}")
-            return 0.0
-        except Exception as e:
-            logger.error(f"Unexpected error computing cyclomatic complexity: {e}")
-            return 0.0
-
-    def reward_function_code(self, code: str, test: str) -> Tuple[float, float]:
-        """
-        Compute rewards for code tasks.
-
-        Args:
-            code (str): Generated code.
-            test (str): Test case code.
-
-        Returns:
-            Tuple containing reward and cyclomatic complexity.
-        """
-        success = self.safe_execute_code(code, test)
-        cyclomatic = self.compute_cyclomatic_complexity(code) if self.config.compute_cyclomatic_complexity else 0.0
-        reward = 1.0 if success else 0.0
-        logger.debug(f"Code reward: {reward}, Cyclomatic complexity: {cyclomatic}")
-        return reward, cyclomatic
 
     def compute_rewards(
         self,
@@ -912,42 +846,21 @@ class SCoReTrainer:
             RewardsDict: Dictionary containing rewards and metrics.
         """
         rewards = []
-        bleu = []
-        rouge = []
-        cyclomatic = []
 
         for i, gen in enumerate(generated):
             try:
                 if self.config.task == 'MATH':
-                    r, b, ro = self.reward_function_math(gen, correct[i])
+                    r = self.reward_function_math(gen, correct[i])
                     rewards.append(r)
-                    bleu.append(b)
-                    rouge.append(ro)
-                elif self.config.task == 'CODE':
-                    test = test_cases[i] if test_cases and i < len(test_cases) else ''
-                    if test:
-                        r, c = self.reward_function_code(gen, test)
-                    else:
-                        logger.warning(f"Missing test case for CODE task at index {i}. Assigning zero reward.")
-                        r, c = 0.0, 0.0
-                    rewards.append(r)
-                    cyclomatic.append(c)
+
             except Exception as e:
                 logger.error(f"Error computing rewards for index {i}: {e}")
                 rewards.append(0.0)
-                if self.config.task == 'MATH':
-                    bleu.append(0.0)
-                    rouge.append({})
-                elif self.config.task == 'CODE':
-                    cyclomatic.append(0.0)
-
+  
         rewards_tensor = torch.tensor(rewards, device=self.config.device)
         logger.debug(f"Rewards computed: {rewards}")
         return {
             'rewards': rewards_tensor,
-            'bleu': bleu,
-            'rouge': rouge,
-            'cyclomatic': cyclomatic
         }
 
     def compute_edit_distance_ratio(self, s1: str, s2: str) -> float:
