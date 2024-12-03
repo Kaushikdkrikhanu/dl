@@ -34,6 +34,7 @@ from sympy import simplify, SympifyError
 from sympy.parsing.sympy_parser import parse_expr
 import ast
 import wandb
+from datetime import datetime
 
 # Initialize NLTK
 try:
@@ -156,42 +157,6 @@ def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
         "<|assistant|>"
     )
 
-
-def get_code_first_turn_prompt(problem: str) -> str:
-    """Generate the first turn prompt for code problems.
-    
-    Args:
-        problem (str): Problem description including function signature and test cases
-        
-    Returns:
-        str: Formatted prompt for first attempt
-    """
-    return (
-        "<|system|>You are an expert Python programmer, and here is your task:</|system|>\n"
-        f"<|user|>{problem}</|user|>\n"
-        "<|assistant|>"
-    )
-
-def get_code_correction_prompt(problem: str, prev_attempt: str) -> str:
-    """Generate the self-correction prompt for code problems.
-    
-    Args:
-        problem (str): Original problem description including function signature and test cases 
-        prev_attempt (str): Previous code attempt to be corrected
-        
-    Returns:
-        str: Formatted prompt for correction attempt
-    """
-    return (
-        "<|system|>There might be an error in the code above because of lack of understanding of the question. Please correct the "
-        "error, if any, and rewrite the solution. Only output the final correct Python program!</|system|>\n"
-        f"<|user|>Problem:\n{problem}\n\n"
-        f"Previous solution:\n{prev_attempt}\n\n"
-        "Please provide a corrected solution.</|user|>\n"
-        "<|assistant|>"
-    )
-
-
 class BaseDataset(Dataset):
     """
     Base dataset class for loading data.
@@ -220,11 +185,6 @@ class BaseDataset(Dataset):
                 return get_math_first_turn_prompt(item['problem'])
             else:
                 return get_math_correction_prompt(item['problem'], prev_attempt)
-        elif self.task == 'CODE':
-            if turn == 1:
-                return get_code_first_turn_prompt(item.get('text', item.get('prompt', '')))
-            else:
-                return get_code_correction_prompt(item.get('text', item.get('prompt', '')), prev_attempt)
         else:
             raise NotImplementedError(f"Task {self.task} is not implemented")
 
@@ -566,13 +526,11 @@ class SCoReTrainer:
             self.rouge = Rouge()
             self.smoothing = SmoothingFunction()
 
-
         try:
             wandb.login(key="5846629ab2a2094c5948b4c032301fdae772fbb0", relogin=True) 
-            
             wandb.init(
                 project="score-training",
-                name=f"Run-{config.task}-{config.model_variant}-{config.seed}",
+                name=f"Run-{config.task}-{config.model_variant}-{config.seed}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                 config={
                     "task": config.task,
                     "model_variant": config.model_variant,
@@ -994,20 +952,6 @@ class SCoReTrainer:
                 else:
                     inputs = get_math_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_math_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
                 tests = None
-            elif self.task == 'CODE':
-                if isinstance(batch, dict):
-                    problem = batch.get('text', batch.get('prompt', ''))
-                    correct = batch.get('code', batch.get('canonical_solution', ''))
-                    tests = batch.get('test_list', batch.get('test', ''))
-                else:
-                    problem = [item.get('text', item.get('prompt', '')) for item in batch]
-                    correct = [item.get('code', item.get('canonical_solution', '')) for item in batch]
-                    tests = [item.get('test_list', item.get('test', '')) for item in batch]
-                
-                if turn == 1:
-                    inputs = get_code_first_turn_prompt(problem) if isinstance(problem, str) else [get_code_first_turn_prompt(p) for p in problem]
-                else:
-                    inputs = get_code_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_code_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
             else:
                 # Handle other tasks
                 raise NotImplementedError("Not implemented for this task")
@@ -1187,9 +1131,7 @@ class SCoReTrainer:
                                 metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
                             if self.config.compute_rouge:
                                 metrics["rouge_scores"] = [r.get('f', 0.0) for r in self.compute_rewards(second_responses, correct, tests)['rouge']]
-                        elif self.config.task == 'CODE' and self.config.compute_cyclomatic_complexity:
-                            metrics["cyclomatic_scores"] = self.compute_rewards(second_responses, correct, tests)['cyclomatic']
-
+                        
                         # Log metrics
                         self.log_metrics(metrics, step=self.global_step)
 
@@ -1322,9 +1264,6 @@ class SCoReTrainer:
                             if self.config.compute_rouge:
                                 metrics["rouge_scores"] = [r.get('f', 0.0) for r in 
                                     self.compute_rewards(second_responses, correct, tests)['rouge']]
-                        elif self.config.task == 'CODE' and self.config.compute_cyclomatic_complexity:
-                            metrics["cyclomatic_scores"] = self.compute_rewards(second_responses, correct, tests)['cyclomatic']
-
                         # Log metrics
                         self.log_metrics(metrics, step=self.global_step)
 
@@ -1378,7 +1317,6 @@ class SCoReTrainer:
         self.model.eval()
         total_correct_t1, total_correct_t2, total_samples = 0.0, 0.0, 0
         delta_i_to_c, delta_c_to_i = 0, 0
-        bleu_scores, rouge_scores, cyclomatic_complexities = [], [], []
 
         try:
             with torch.no_grad():
@@ -1441,20 +1379,6 @@ class SCoReTrainer:
                                 delta_c_to_i += 1
                             total_samples += 1
 
-                            if self.config.task == 'MATH':
-                                if self.config.compute_bleu:
-                                    bleu_first = self.compute_rewards([first[i]], [correct[i]], tests)['bleu'][0]
-                                    bleu_second = self.compute_rewards([second[i]], [correct[i]], tests)['bleu'][0]
-                                    bleu_scores.extend([bleu_first, bleu_second])
-                                if self.config.compute_rouge:
-                                    rouge_first = self.compute_rewards([first[i]], [correct[i]], tests)['rouge'][0].get('f', 0.0)
-                                    rouge_second = self.compute_rewards([second[i]], [correct[i]], tests)['rouge'][0].get('f', 0.0)
-                                    rouge_scores.extend([rouge_first, rouge_second])
-                            elif self.config.task == 'CODE':
-                                if self.config.compute_cyclomatic_complexity:
-                                    cyclomatic = self.compute_rewards([second[i]], [correct[i]], tests)['cyclomatic'][0]
-                                    cyclomatic_complexities.append(cyclomatic)
-
                             # Compute edit distance ratio
                             ratio = self.compute_edit_distance_ratio(first[i], second[i])
                             self.edit_distance_ratios.append(ratio)
@@ -1473,18 +1397,6 @@ class SCoReTrainer:
             logger.info(f"Δ(t1,t2): {delta:.4f}")
             logger.info(f"Δ_i→c(t1,t2): {delta_i_to_c_frac:.4f}")
             logger.info(f"Δ_c→i(t1,t2): {delta_c_to_i_frac:.4f}")
-
-            if self.config.task == 'MATH':
-                if self.config.compute_bleu and bleu_scores:
-                    avg_bleu = np.mean(bleu_scores)
-                    logger.info(f"Average BLEU Score: {avg_bleu:.4f}")
-                if self.config.compute_rouge and rouge_scores:
-                    avg_rouge = np.mean([score for score in rouge_scores if score is not None])
-                    logger.info(f"Average ROUGE-F1 Score: {avg_rouge:.4f}")
-            elif self.config.task == 'CODE':
-                if self.config.compute_cyclomatic_complexity and cyclomatic_complexities:
-                    avg_cyclomatic = np.mean(cyclomatic_complexities)
-                    logger.info(f"Average Cyclomatic Complexity: {avg_cyclomatic:.4f}")
 
             self.plot_reward_history()
             self.plot_edit_distance_ratios()
@@ -1542,9 +1454,6 @@ def main():
     parser.add_argument('--data_path', type=str, default='./data', help="Path to the data directory")
     parser.add_argument('--output_dir', type=str, default='./outputs', help="Directory to save outputs")
     parser.add_argument('--mixed_precision', action='store_true', help="Enable mixed precision training")
-    parser.add_argument('--no_bleu', action='store_false', dest='compute_bleu', help="Disable BLEU score computation")
-    parser.add_argument('--no_rouge', action='store_false', dest='compute_rouge', help="Disable ROUGE score computation")
-    parser.add_argument('--no_cyclomatic', action='store_false', dest='compute_cyclomatic_complexity', help="Disable cyclomatic complexity computation")
     args = parser.parse_args()
 
     # Initialize configuration
@@ -1555,9 +1464,6 @@ def main():
         data_path=args.data_path,
         output_dir=args.output_dir,
         mixed_precision=args.mixed_precision,
-        compute_bleu=args.compute_bleu,
-        compute_rouge=args.compute_rouge,
-        compute_cyclomatic_complexity=args.compute_cyclomatic_complexity,
         logging_steps=1
     )
 
@@ -1577,11 +1483,8 @@ def main():
     if config.task == 'MATH':
         train_file = os.path.join(config.data_path, 'selected_problems_105.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
-    elif config.task == 'CODE':
-        train_file = os.path.join(config.data_path, 'mbpp.jsonl')
-        val_file = os.path.join(config.data_path, 'mbpp.jsonl')
     else:
-        logger.critical("Invalid task specified. Choose between 'MATH' and 'CODE'.")
+        logger.critical("Invalid task specified!")
         return
 
     # Check data file existence
@@ -1593,9 +1496,6 @@ def main():
     # Load datasets
     try:
         if config.task == 'MATH':
-            train_data = load_json(train_file, 1000)
-            val_data = load_json(val_file, 100)
-        elif config.task == 'CODE':
             train_data = load_json(train_file, 1000)
             val_data = load_json(val_file, 100)
         train_dataset = BaseDataset(train_data, task=config.task) 
