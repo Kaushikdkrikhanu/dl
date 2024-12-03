@@ -1,0 +1,16 @@
+{"time":"2024-12-02T23:35:12.181573079Z","level":"INFO","msg":"using version","core version":"0.18.7"}
+{"time":"2024-12-02T23:35:12.18158574Z","level":"INFO","msg":"created symlink","path":"/home/ubuntu/dl-1/wandb/run-20241202_233512-il3ik0b6/logs/debug-core.log"}
+{"time":"2024-12-02T23:35:12.285488825Z","level":"INFO","msg":"created new stream","id":"il3ik0b6"}
+{"time":"2024-12-02T23:35:12.285511506Z","level":"INFO","msg":"stream: started","id":"il3ik0b6"}
+{"time":"2024-12-02T23:35:12.285538447Z","level":"INFO","msg":"writer: Do: started","stream_id":"il3ik0b6"}
+{"time":"2024-12-02T23:35:12.285561809Z","level":"INFO","msg":"sender: started","stream_id":"il3ik0b6"}
+{"time":"2024-12-02T23:35:12.285624142Z","level":"INFO","msg":"handler: started","stream_id":"il3ik0b6"}
+{"time":"2024-12-02T23:35:12.454781989Z","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-12-02T23:40:05.931410374Z","level":"INFO","msg":"stream: closing","id":"il3ik0b6"}
+{"time":"2024-12-02T23:40:05.931470797Z","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-12-02T23:40:05.932265393Z","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-12-02T23:40:06.539330749Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-12-02T23:40:06.613785267Z","level":"INFO","msg":"handler: closed","stream_id":"il3ik0b6"}
+{"time":"2024-12-02T23:40:06.61383796Z","level":"INFO","msg":"writer: Close: closed","stream_id":"il3ik0b6"}
+{"time":"2024-12-02T23:40:06.613876623Z","level":"INFO","msg":"sender: closed","stream_id":"il3ik0b6"}
+{"time":"2024-12-02T23:40:06.613996289Z","level":"INFO","msg":"stream: closed","id":"il3ik0b6"}

@@ -1,0 +1,46 @@
+_wandb:
+    value:
+        cli_version: 0.18.7
+        m: []
+        python_version: 3.12.7
+        t:
+            "1":
+                - 1
+                - 11
+                - 49
+                - 55
+                - 71
+                - 98
+            "2":
+                - 1
+                - 11
+                - 49
+                - 55
+                - 71
+                - 98
+            "3":
+                - 16
+                - 23
+                - 55
+                - 61
+            "4": 3.12.7
+            "5": 0.18.7
+            "6": 4.46.3
+            "8":
+                - 5
+            "12": 0.18.7
+            "13": linux-x86_64
+alpha:
+    value: 5
+batch_size:
+    value: 1
+beta_1:
+    value: 0.01
+beta_2:
+    value: 0.1
+learning_rate:
+    value: 1e-05
+model_variant:
+    value: meta-llama/Llama-3.2-1B-Instruct
+task:
+    value: MATH

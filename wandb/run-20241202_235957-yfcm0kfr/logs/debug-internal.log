@@ -1,0 +1,16 @@
+{"time":"2024-12-02T23:59:57.061428842Z","level":"INFO","msg":"using version","core version":"0.18.7"}
+{"time":"2024-12-02T23:59:57.061442022Z","level":"INFO","msg":"created symlink","path":"/home/ubuntu/dl-1/wandb/run-20241202_235957-yfcm0kfr/logs/debug-core.log"}
+{"time":"2024-12-02T23:59:57.165346794Z","level":"INFO","msg":"created new stream","id":"yfcm0kfr"}
+{"time":"2024-12-02T23:59:57.165378286Z","level":"INFO","msg":"stream: started","id":"yfcm0kfr"}
+{"time":"2024-12-02T23:59:57.165397167Z","level":"INFO","msg":"handler: started","stream_id":"yfcm0kfr"}
+{"time":"2024-12-02T23:59:57.165426239Z","level":"INFO","msg":"sender: started","stream_id":"yfcm0kfr"}
+{"time":"2024-12-02T23:59:57.165400257Z","level":"INFO","msg":"writer: Do: started","stream_id":"yfcm0kfr"}
+{"time":"2024-12-02T23:59:57.318232447Z","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-12-03T00:27:06.437117364Z","level":"INFO","msg":"stream: closing","id":"yfcm0kfr"}
+{"time":"2024-12-03T00:27:06.437145236Z","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-12-03T00:27:06.437617633Z","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-12-03T00:27:07.554612901Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-12-03T00:27:07.813883207Z","level":"INFO","msg":"handler: closed","stream_id":"yfcm0kfr"}
+{"time":"2024-12-03T00:27:07.813989933Z","level":"INFO","msg":"writer: Close: closed","stream_id":"yfcm0kfr"}
+{"time":"2024-12-03T00:27:07.814012145Z","level":"INFO","msg":"sender: closed","stream_id":"yfcm0kfr"}
+{"time":"2024-12-03T00:27:07.814086269Z","level":"INFO","msg":"stream: closed","id":"yfcm0kfr"}

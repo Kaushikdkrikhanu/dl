@@ -1,0 +1,16 @@
+{"time":"2024-12-02T23:26:01.9691368Z","level":"INFO","msg":"using version","core version":"0.18.7"}
+{"time":"2024-12-02T23:26:01.969152341Z","level":"INFO","msg":"created symlink","path":"/home/ubuntu/dl-1/wandb/run-20241202_232601-3jt8iiir/logs/debug-core.log"}
+{"time":"2024-12-02T23:26:02.073273603Z","level":"INFO","msg":"created new stream","id":"3jt8iiir"}
+{"time":"2024-12-02T23:26:02.073294494Z","level":"INFO","msg":"stream: started","id":"3jt8iiir"}
+{"time":"2024-12-02T23:26:02.073340547Z","level":"INFO","msg":"sender: started","stream_id":"3jt8iiir"}
+{"time":"2024-12-02T23:26:02.073354358Z","level":"INFO","msg":"handler: started","stream_id":"3jt8iiir"}
+{"time":"2024-12-02T23:26:02.073342197Z","level":"INFO","msg":"writer: Do: started","stream_id":"3jt8iiir"}
+{"time":"2024-12-02T23:26:02.208483262Z","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-12-02T23:32:32.498465405Z","level":"INFO","msg":"stream: closing","id":"3jt8iiir"}
+{"time":"2024-12-02T23:32:32.498534709Z","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-12-02T23:32:32.499217778Z","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-12-02T23:32:32.781178762Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-12-02T23:32:32.878209259Z","level":"INFO","msg":"handler: closed","stream_id":"3jt8iiir"}
+{"time":"2024-12-02T23:32:32.878287633Z","level":"INFO","msg":"writer: Close: closed","stream_id":"3jt8iiir"}
+{"time":"2024-12-02T23:32:32.878310795Z","level":"INFO","msg":"sender: closed","stream_id":"3jt8iiir"}
+{"time":"2024-12-02T23:32:32.878528237Z","level":"INFO","msg":"stream: closed","id":"3jt8iiir"}
