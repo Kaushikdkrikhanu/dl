@@ -107,8 +107,6 @@ class Config:
     max_eval_samples: int = 500
     mixed_precision: bool = False
     save_total_limit: int = 2
-    compute_bleu: bool = False
-    compute_rouge: bool = False
     compute_cyclomatic_complexity: bool = False
 
     def validate(self) -> None:
@@ -136,8 +134,8 @@ def get_math_first_turn_prompt(problem: str) -> str:
     """Generate the first turn prompt for math problems."""
     return (
         "<|system|>You are a math expert. When you respond, respond only with the Solution of the final Problem, thinking "
-        "step by step. At the end of the Solution, when you give your final answer, write it in the form "
-        "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
+        "step by step. At the end of the Solution, when you give your final answer , write it in the form "
+        "'Final Answer: The final answer is \\boxed{answer} with the value rounded to 4 decimal places.. I hope it is correct.' Do Not use any mathematical expressions in the box."
         "</|system|>\n"
         f"<|user|>{problem}</|user|>\n"
         "<|assistant|>" 
@@ -149,7 +147,7 @@ def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
         "<|system|>There might be an error in the solution above because of lack of understanding of the question. "
         "Please correct the error, if any, and rewrite the solution. Only output the final solution! "
         "At the end of the Solution, when you give your final answer, write it in the form "
-        "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
+        "'Final Answer: The final answer is \\boxed{answer} with the value rounded to 4 decimal places.. I hope it is correct.' Do Not use any mathematical expressions in the box."
         "</|system|>\n"
         f"<|user|>Problem: {problem}\n\n"
         f"Previous solution:\n{prev_attempt}\n"
@@ -487,9 +485,6 @@ class RewardsDict(TypedDict):
     TypedDict for rewards and related metrics.
     """
     rewards: torch.Tensor
-    bleu: List[float]
-    rouge: List[Dict[str, float]]
-    cyclomatic: List[float]
 
 
 class SCoReTrainer:
@@ -523,7 +518,6 @@ class SCoReTrainer:
         self.use_wandb = False
         
         if config.task == 'MATH':
-            self.rouge = Rouge()
             self.smoothing = SmoothingFunction()
 
         try:
@@ -567,7 +561,7 @@ class SCoReTrainer:
             logger.error(f"Error computing KL divergence: {e}")
             raise RuntimeError("KL divergence computation failed.") from e
 
-    def reward_function_math(self, generated: str, correct: str) -> Tuple[float, float, Dict[str, float]]:
+    def reward_function_math(self, generated: str, correct: str) -> Tuple[float]:
         """
         Compute rewards for math tasks.
 
@@ -580,8 +574,6 @@ class SCoReTrainer:
         """
         # Initialize default values
         reward = 0.0
-        bleu = 0.0
-        rouge = {}
 
         logger.info(f"\n=== Math Reward Computation ===")
         trace_info = {
@@ -602,11 +594,7 @@ class SCoReTrainer:
                 "final_reward": 0.0,
                 "comparison_result": None,
                 "error": None
-            },
-            "metrics": {
-                    "bleu": 0.0,
-                    "rouge": {}
-                }
+            }
         }
         try:
             # Extract answer from \boxed{} format
@@ -639,7 +627,7 @@ class SCoReTrainer:
 
             if generated_ans is None:
                 logger.info("No boxed answer found in generated answer")
-                return 0.0, 0.0, {'f': 0.0}
+                return 0.0
 
             # Clean the answers
             for char in [' ', '$', '\\n', '\\', '{', '}']:
@@ -717,12 +705,11 @@ class SCoReTrainer:
                 logger.info(f"Expression comparison reward: {reward}")
             except (SympifyError, TypeError, ValueError) as e:
                 logger.info(f"Expression parsing failed: {str(e)}")
-            #     logger.info("Falling back to string comparison")
-                
-            #     trace_info["reward_computation"]["method_used"] = "string_comparison"
-            #     trace_info["reward_computation"]["error"] = str(e)
-            #     reward = 1.0 if generated_ans == correct_ans else 0.0
-            #     logger.info(f"String comparison reward: {reward}")
+                logger.info("Falling back to string comparison")
+                trace_info["reward_computation"]["method_used"] = "string_comparison"
+                trace_info["reward_computation"]["error"] = str(e)
+                reward = 1.0 if generated_ans == correct_ans else 0.0
+                logger.info(f"String comparison reward: {reward}")
 
         except Exception as e:
             trace_info["reward_computation"]["error"] = str(e)
@@ -817,9 +804,7 @@ class SCoReTrainer:
   
         rewards_tensor = torch.tensor(rewards, device=self.config.device)
         logger.debug(f"Rewards computed: {rewards}")
-        return {
-            'rewards': rewards_tensor,
-        }
+        return {'rewards': rewards_tensor}
 
     def compute_edit_distance_ratio(self, s1: str, s2: str) -> float:
         """
@@ -915,11 +900,6 @@ class SCoReTrainer:
                 
                 # Edit distance metrics
                 "train/edit_distance_ratio": np.mean(metrics.get("edit_distance_ratios", [0.0])),
-                
-                # Task-specific metrics
-                "train/bleu_score": np.mean(metrics.get("bleu_scores", [0.0])) if self.config.compute_bleu else None,
-                "train/rouge_score": np.mean(metrics.get("rouge_scores", [0.0])) if self.config.compute_rouge else None,
-                "train/cyclomatic_complexity": np.mean(metrics.get("cyclomatic_scores", [0.0])) if self.config.compute_cyclomatic_complexity else None
             }
 
             # Remove None values
@@ -1027,30 +1007,6 @@ class SCoReTrainer:
                     # Total loss is negative reward for second attempt plus KL penalty on first attempt
                     loss = -rewards.mean() + kl_loss
 
-                    try:
-                        # Collect metrics
-                        metrics = {
-                            "total_loss": loss.item(),
-                            "kl_loss": kl_loss.item(),
-                            "reward_loss": -rewards.mean(),
-                            "rewards_t1": torch.zeros_like(rewards),  # First attempt has no rewards in Stage I
-                            "rewards_t2": rewards,
-                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]
-                        }
-
-                        # Add task-specific metrics
-                        if self.config.task == 'MATH':
-                            if self.config.compute_bleu:
-                                metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
-                            if self.config.compute_rouge:
-                                metrics["rouge_scores"] = [r.get('f', 0.0) for r in self.compute_rewards(second_responses, correct, tests)['rouge']]
-                        
-                        # Log metrics
-                        self.log_metrics(metrics, step=self.global_step)
-
-                    except Exception as e:
-                        logger.error(f"Error collecting or logging metrics in Stage I: {e}")
-
             except Exception as e:
                 logger.error(f"Error during Stage I forward pass: {e}")
                 continue
@@ -1078,6 +1034,22 @@ class SCoReTrainer:
 
             if self.global_step % self.config.logging_steps == 0:
                 logger.info(f"Stage I - Step {self.global_step}, Loss: {loss.item():.4f}")
+            
+            try:
+                # Collect metrics
+                metrics = {
+                    "total_loss": loss.item(),
+                    "kl_loss": kl_loss.item(),
+                    "reward_loss": -rewards.mean(),
+                    "rewards_t1": torch.zeros_like(rewards),  # First attempt has no rewards in Stage I
+                    "rewards_t2": rewards,
+                    "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]
+                }
+                # Log metrics
+                self.log_metrics(metrics, step=self.global_step)
+
+            except Exception as e:
+                logger.error(f"Error collecting or logging metrics in Stage I: {e}")
 
     def stage_two(self) -> None:
         """
@@ -1159,30 +1131,6 @@ class SCoReTrainer:
                     # Final loss
                     loss = -total_rewards.mean() + kl_loss
 
-                    try:
-                        # Collect metrics
-                        metrics = {
-                            "total_loss": loss.item(),
-                            "kl_loss": kl_loss.item(),
-                            "reward_loss": -(total_rewards.mean()),
-                            "rewards_t1": first_rewards,
-                            "rewards_t2": second_rewards,
-                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]  # Fixed variable names
-                        }
-
-                        # Add task-specific metrics
-                        if self.config.task == 'MATH':
-                            if self.config.compute_bleu:
-                                metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
-                            if self.config.compute_rouge:
-                                metrics["rouge_scores"] = [r.get('f', 0.0) for r in 
-                                    self.compute_rewards(second_responses, correct, tests)['rouge']]
-                        # Log metrics
-                        self.log_metrics(metrics, step=self.global_step)
-
-                    except Exception as e:
-                        logger.error(f"Error collecting or logging metrics in Stage II: {e}")
-
 
             except Exception as e:
                 logger.error(f"Error during Stage II forward pass: {e}")
@@ -1214,6 +1162,22 @@ class SCoReTrainer:
                     f"Stage II - Step {self.global_step}, Loss: {loss.item():.4f}, "
                     f"Total Reward: {total_rewards.mean().item():.4f}"
                 )
+            try:
+                # Collect metrics
+                metrics = {
+                    "total_loss": loss.item(),
+                    "kl_loss": kl_loss.item(),
+                    "reward_loss": -(total_rewards.mean()),
+                    "rewards_t1": first_rewards,
+                    "rewards_t2": second_rewards,
+                    "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]  # Fixed variable names
+                }
+
+                # Log metrics
+                self.log_metrics(metrics, step=self.global_step)
+
+            except Exception as e:
+                logger.error(f"Error collecting or logging metrics in Stage II: {e}")
 
     def __del__(self):
         """Cleanup wandb on deletion."""
