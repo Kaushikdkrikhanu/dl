@@ -1,0 +1,1 @@
+{"_runtime":4113.415908957,"_timestamp":1.7332781502913508e+09,"_step":90,"_wandb":{"runtime":4113},"train/reward_loss":0,"train/reward_improvement":0,"train/total_loss":0.0004150218446739018,"train/mean_reward_t1":0,"train/edit_distance_ratio":0.030664395229982964,"train/kl_loss":0.0004150218446739018,"train/mean_reward_t2":0,"train/learning_rate":6.700000000000001e-06}

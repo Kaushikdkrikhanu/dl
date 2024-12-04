@@ -86,8 +86,8 @@ class Config:
     batch_size: int = 1
     max_seq_len: int = 2048
     max_new_tokens: int = 2048
-    num_epochs_stage_one: int = 1
-    num_epochs_stage_two: int = 1
+    num_epochs_stage_one: int = 25
+    num_epochs_stage_two: int = 25
 
     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device: torch.device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -107,7 +107,6 @@ class Config:
     max_eval_samples: int = 500
     mixed_precision: bool = False
     save_total_limit: int = 2
-    compute_cyclomatic_complexity: bool = False
 
     def validate(self) -> None:
         """
@@ -669,38 +668,42 @@ class SCoReTrainer:
                 # String comparison fallback reward calculation
                 # Based on principles of self-correction via string similarity
                 reward = 0.0
-                if generated_ans == correct_ans:
-                    reward = 1.0
-                else:
-                    # Compute Levenshtein distance for partial credit
-                    def levenshtein_distance(s1, s2):
-                        if len(s1) < len(s2):
-                            return levenshtein_distance(s2, s1)
-                        if len(s2) == 0:
-                            return len(s1)
+                # if generated_ans == correct_ans:
+                #     reward = 1.0
+                # else:
+                #     # Compute Levenshtein distance for partial credit
+                #     def levenshtein_distance(s1, s2):
+                #         if len(s1) < len(s2):
+                #             return levenshtein_distance(s2, s1)
+                #         if len(s2) == 0:
+                #             return len(s1)
 
-                        previous_row = range(len(s2) + 1)
-                        for i, c1 in enumerate(s1):
-                            current_row = [i + 1]
-                            for j, c2 in enumerate(s2):
-                                insertions = previous_row[j + 1] + 1
-                                deletions = current_row[j] + 1
-                                substitutions = previous_row[j] + (c1 != c2)
-                                current_row.append(min(insertions, deletions, substitutions))
-                            previous_row = current_row
+                #         previous_row = range(len(s2) + 1)
+                #         for i, c1 in enumerate(s1):
+                #             current_row = [i + 1]
+                #             for j, c2 in enumerate(s2):
+                #                 insertions = previous_row[j + 1] + 1
+                #                 deletions = current_row[j] + 1
+                #                 substitutions = previous_row[j] + (c1 != c2)
+                #                 current_row.append(min(insertions, deletions, substitutions))
+                #             previous_row = current_row
 
-                        return previous_row[-1]
+                #         return previous_row[-1]
 
-                    # Normalize the Levenshtein distance
-                    max_len = max(len(generated_ans), len(correct_ans))
-                    distance = levenshtein_distance(generated_ans, correct_ans)
-                    similarity = 1 - (distance / max_len)
+                #     # Normalize the Levenshtein distance
+                #     max_len = max(len(generated_ans), len(correct_ans))
+                #     distance = levenshtein_distance(generated_ans, correct_ans)
+                #     similarity = 1 - (distance / max_len)
                     
-                    # Exponential reward to emphasize correctness
-                    reward = max(0, similarity ** 2)
+                #     # Exponential reward to emphasize correctness
+                #     reward = max(0, similarity ** 2)
 
-                logger.info(f"String comparison distance: {distance}")
-                logger.info(f"Similarity score: {similarity}")
+                # logger.info(f"String comparison distance: {distance}")
+                # logger.info(f"Similarity score: {similarity}")
+
+
+                reward = max((1 - abs(s1 - s2) / (s2 + 1e-8)), 0)
+
                 ####################################################################### 
                 logger.info(f"Expression comparison reward: {reward}")
             except (SympifyError, TypeError, ValueError) as e:

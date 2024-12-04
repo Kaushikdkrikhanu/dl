@@ -1,0 +1,16 @@
+{"time":"2024-12-04T01:01:32.499582112Z","level":"INFO","msg":"using version","core version":"0.18.7"}
+{"time":"2024-12-04T01:01:32.499594013Z","level":"INFO","msg":"created symlink","path":"/home/ubuntu/dl-1/wandb/run-20241204_010132-st53w29b/logs/debug-core.log"}
+{"time":"2024-12-04T01:01:32.603384452Z","level":"INFO","msg":"created new stream","id":"st53w29b"}
+{"time":"2024-12-04T01:01:32.603406833Z","level":"INFO","msg":"stream: started","id":"st53w29b"}
+{"time":"2024-12-04T01:01:32.603450716Z","level":"INFO","msg":"handler: started","stream_id":"st53w29b"}
+{"time":"2024-12-04T01:01:32.603445735Z","level":"INFO","msg":"writer: Do: started","stream_id":"st53w29b"}
+{"time":"2024-12-04T01:01:32.603475617Z","level":"INFO","msg":"sender: started","stream_id":"st53w29b"}
+{"time":"2024-12-04T01:01:32.809527275Z","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-12-04T02:10:05.914527555Z","level":"INFO","msg":"stream: closing","id":"st53w29b"}
+{"time":"2024-12-04T02:10:05.914913037Z","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-12-04T02:10:05.91586195Z","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-12-04T02:10:07.090251538Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-12-04T02:10:07.241330227Z","level":"INFO","msg":"handler: closed","stream_id":"st53w29b"}
+{"time":"2024-12-04T02:10:07.241360939Z","level":"INFO","msg":"writer: Close: closed","stream_id":"st53w29b"}
+{"time":"2024-12-04T02:10:07.24138099Z","level":"INFO","msg":"sender: closed","stream_id":"st53w29b"}
+{"time":"2024-12-04T02:10:07.241422192Z","level":"INFO","msg":"stream: closed","id":"st53w29b"}
