@@ -869,10 +869,30 @@ class SCoReTrainer:
         Save trace information to a JSON file with pretty printing.
         """
         try:
+            # Convert sympy types to native Python types
+            def convert_sympy(obj):
+                if hasattr(obj, 'evalf'):  # Check if it's a sympy object
+                    return float(obj.evalf())
+                return obj
+
+            # Recursively convert all values in the dictionary
+            def convert_dict(d):
+                result = {}
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        result[k] = convert_dict(v)
+                    elif isinstance(v, (list, tuple)):
+                        result[k] = [convert_sympy(x) for x in v]
+                    else:
+                        result[k] = convert_sympy(v)
+                return result
+
+            converted_trace = convert_dict(trace_info)
+            
             trace_file = os.path.join(self.config.output_dir, 'reward_traces2.jsonl')
             with open(trace_file, 'a') as f:
                 # Pretty print the JSON with indentation
-                json_str = json.dumps(trace_info, indent=2)
+                json_str = json.dumps(converted_trace, indent=2)
                 # Add a newline after each JSON object
                 f.write(json_str + '\n\n')
         except Exception as e:
