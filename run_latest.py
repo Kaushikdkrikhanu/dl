@@ -622,7 +622,6 @@ class SCoReTrainer:
                 """
                 Extract answer from \boxed{} format with improved pattern matching.
                 """
-                # Try different boxed formats
                 patterns = [
                     r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}',  # Standard \boxed{...}
                     r'\\boxed{{([^{}]*(?:{[^{}]*})*[^{}]*?)}}',  # Double braces \boxed{{...}}
@@ -634,7 +633,9 @@ class SCoReTrainer:
                 for pattern in patterns:
                     matches = re.findall(pattern, text, re.DOTALL)
                     if matches:
-                        return matches[-1].strip()
+                        # Remove any $ symbols and whitespace from the matched answer
+                        answer = matches[-1].strip().replace('$', '').strip()
+                        return answer
                 
                 # If no boxed format found, try to find a final answer in plain text
                 final_answer_pattern = r'Final Answer:\s*(\d+)'
@@ -824,10 +825,6 @@ class SCoReTrainer:
                 if gen_expr == cor_expr:
                     reward = 1.0
                     trace_info["reward_computation"]["comparison_result"] = "expression_match"
-                    trace_info["reward_computation"]["final_reward"] = reward
-                elif extract_boxed_answer(generated_ans) == extract_boxed_answer(correct_ans):
-                    reward = 1.0
-                    trace_info["reward_computation"]["comparison_result"] = "boxed_answer_match"
                     trace_info["reward_computation"]["final_reward"] = reward
                 else:
                     difference = simplify(gen_expr - cor_expr)
