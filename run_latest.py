@@ -936,6 +936,8 @@ class SCoReTrainer:
                     first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=0.7)
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     
+                    # maybe this is needed too in stage_two?
+                    first_responses = [first_response.split("assistant\n\n", 1)[-1] for first_response in first_responses]
                     # Print first attempt details
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
