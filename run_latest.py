@@ -319,8 +319,8 @@ class AdvancedModel(nn.Module):
 
         try:
             lora_config = LoraConfig(
-                r=128,  # Rank of the low-rank matrices
-                lora_alpha=32,  # Scaling factor
+                r=64,  # Rank of the low-rank matrices
+                lora_alpha=64,  # Scaling factor
                 target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
                 lora_dropout=0.1,  # Dropout for LoRA layers
                 bias="none",  # Bias handling ("none", "all", or "lora_only")
