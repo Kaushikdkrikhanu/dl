@@ -5,6 +5,7 @@ import threading
 import argparse
 import logging
 import re   
+import math
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -317,14 +318,14 @@ class AdvancedModel(nn.Module):
             logger.info("Using EOS token as PAD token.")
 
         try:
-            # lora_config = LoraConfig(
-            #     r=4,  # Rank of the low-rank matrices
-            #     lora_alpha=32,  # Scaling factor
-            #     target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
-            #     lora_dropout=0.1,  # Dropout for LoRA layers
-            #     bias="none",  # Bias handling ("none", "all", or "lora_only")
-            #     task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
-            # )
+            lora_config = LoraConfig(
+                r=128,  # Rank of the low-rank matrices
+                lora_alpha=32,  # Scaling factor
+                target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
+                lora_dropout=0.1,  # Dropout for LoRA layers
+                bias="none",  # Bias handling ("none", "all", or "lora_only")
+                task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
+            )
             # bnb_config = BitsAndBytesConfig(
             #     load_in_4bit=True,  # Enable 4-bit quantization
             #     bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
@@ -335,7 +336,7 @@ class AdvancedModel(nn.Module):
             # self.model = load_checkpoint_and_dispatch(
             #     self.model, model_name, device_map="auto", offload_folder="offload"
             # )
-            # self.model = get_peft_model(self.model, lora_config)
+            self.model = get_peft_model(self.model, lora_config)
             # self.model.print_trainable_parameters()
             # def count_parameters(model):
             #     total_params = sum(p.numel() for p in model.parameters())
@@ -657,7 +658,7 @@ class SCoReTrainer:
 
             if generated_ans is None:
                 logger.info("No boxed answer found in generated answer")
-                # self._save_trace(trace_info)
+                self._save_trace(trace_info)
                 return 0.0
 
             def clean_math_expression(expr: str) -> str:
@@ -673,17 +674,18 @@ class SCoReTrainer:
                 if not expr:
                     return ""
                 
+                # Early numeric conversion
                 try:
-                    # First try direct numeric conversion
-                    return str(float(expr))
+                    float_val = float(expr)
+                    return f"{float_val:.6f}".rstrip('0').rstrip('.')
                 except ValueError:
                     pass
                 
-                # Remove any text formatting and whitespace
+                # Pre-processing cleanup
                 expr = re.sub(r'\\text{([^}]*)}', r'\1', expr)
                 expr = re.sub(r'\s+', '', expr)
                 
-                # LaTeX math commands to Python conversion
+                # Enhanced LaTeX math commands mapping
                 latex_to_python = {
                     # Basic operations
                     '\\cdot': '*',
@@ -696,76 +698,111 @@ class SCoReTrainer:
                     '\\lt': '<',
                     '\\gt': '>',
                     '\\neq': '!=',
+                    '\\approx': '==',
                     
-                    # Special values
+                    # Special values and functions
                     '\\infty': 'float("inf")',
-                    '\\pi': 'pi',
+                    '\\pi': 'pi',  # Changed to work with sympy
+                    '\\e': 'E',
                     
-                    # Signs
-                    '\\pm': '+',  # Simplified to positive case
-                    '\\mp': '-',  # Simplified to negative case
+                    # Trig functions (changed to work with sympy)
+                    '\\sin': 'sin',
+                    '\\cos': 'cos',
+                    '\\tan': 'tan',
+                    '\\arcsin': 'asin',
+                    '\\arccos': 'acos',
+                    '\\arctan': 'atan',
+                    '\\csc': '1/sin',
+                    '\\sec': '1/cos',
+                    '\\cot': '1/tan',
+                    
+                    # Logarithms
+                    '\\ln': 'log',
+                    '\\log': 'log',
+                    
+                    # Cleanup commands
+                    '\\left': '',
+                    '\\right': '',
+                    '\\bigl': '',
+                    '\\bigr': '',
+                    '\\Big': '',
+                    '\\large': '',
+                    '\\small': '',
+                    '\\tiny': '',
+                    '\\normalsize': '',
                 }
                 
-                # Replace LaTeX commands with Python equivalents
+                # Apply LaTeX conversions
                 for latex, python in latex_to_python.items():
                     expr = expr.replace(latex, python)
                 
-                # Handle all types of fractions (\frac, \dfrac, \tfrac)
-                # Keep processing until no more fraction commands are found
+                # Enhanced fraction handling
+                def process_fraction(match):
+                    num, den = match.group(1), match.group(2)
+                    if re.search(r'[+\-*/]', num): num = f"({num})"
+                    if re.search(r'[+\-*/]', den): den = f"({den})"
+                    return f"({num})/({den})"  # Added extra parentheses for safety
+                
+                # Process nested fractions
                 fraction_pattern = r'\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}'
                 while re.search(fraction_pattern, expr):
-                    # Find the innermost fraction (no fraction commands in numerator/denominator)
-                    match = re.search(fraction_pattern, expr)
-                    if not match:
-                        break
-                        
-                    # Extract numerator and denominator
-                    num, den = match.group(1), match.group(2)
-                    
-                    # Handle nested parentheses in numerator/denominator
-                    if re.search(r'[+\-*/]', num):
-                        num = f"({num})"
-                    if re.search(r'[+\-*/]', den):
-                        den = f"({den})"
-                        
-                    # Replace the fraction with division
-                    start, end = match.span()
-                    expr = expr[:start] + f"{num}/{den}" + expr[end:]
+                    expr = re.sub(fraction_pattern, process_fraction, expr)
                 
-                # Handle square roots
-                expr = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', expr)
+                # Enhanced root handling
+                def process_root(match):
+                    index = match.group(1) if match.group(1) else '2'
+                    base = match.group(2)
+                    return f"(({base})**(1/{index}))"
                 
-                # Handle nth roots
-                expr = re.sub(r'\\sqrt\[(\d+)\]\{([^{}]+)\}', r'((\2)**(1/\1))', expr)
+                expr = re.sub(r'\\sqrt\[(\d+)\]\{([^{}]+)\}', process_root, expr)
+                expr = re.sub(r'\\sqrt\{([^{}]+)\}', r'(\1)**(1/2)', expr)
                 
-                # Handle exponents with various formats
+                # Enhanced exponent handling
                 exponent_patterns = [
-                    (r'(\d+)\^{([^{}]+)}', r'\1**(\2)'),  # 2^{x}
-                    (r'(\w+)\^{([^{}]+)}', r'\1**(\2)'),  # x^{2}
-                    (r'(\d+)\^(\d+)', r'\1**\2'),         # 2^2
-                    (r'(\w+)\^(\d+)', r'\1**\2'),         # x^2
+                    (r'(\d+)\^{([^{}]+)}', r'(\1)**(\2)'),
+                    (r'(\w+)\^{([^{}]+)}', r'(\1)**(\2)'),
+                    (r'(\d+)\^(\d+)', r'(\1)**(\2)'),
+                    (r'(\w+)\^(\d+)', r'(\1)**(\2)'),
                 ]
                 for pattern, replacement in exponent_patterns:
                     expr = re.sub(pattern, replacement, expr)
                 
-                # Clean up remaining LaTeX artifacts
-                expr = re.sub(r'\\[a-zA-Z]+', '', expr)  # Remove any remaining LaTeX commands
-                expr = expr.replace('\\', '')            # Remove backslashes
-                expr = expr.replace('{', '').replace('}', '')  # Remove curly braces
-                
-                # Handle boxed answers
+                # Extract boxed content first (if present)
                 boxed_match = re.search(r'\\boxed{([^{}]+)}', expr)
                 if boxed_match:
                     expr = boxed_match.group(1)
                 
-                # Final numeric conversion attempt
+                # Final cleanup
+                expr = re.sub(r'\\[a-zA-Z]+', '', expr)  # Remove remaining LaTeX commands
+                expr = expr.replace('\\', '')
+                expr = expr.replace('{', '(').replace('}', ')')
+                
+                # Add implicit multiplication
+                expr = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', expr)
+                expr = re.sub(r'([a-zA-Z])(\d)', r'\1*\2', expr)
+                expr = re.sub(r'\)(\w)', r')*\1', expr)
+                expr = re.sub(r'(\w)\(', r'\1*(', expr)
+                
+                # Handle e notation
+                expr = re.sub(r'(?<![\d.])e(?![\d])', 'E', expr, flags=re.IGNORECASE)
+                
+                # Final parsing attempt with sympy
                 try:
-                    # Try to evaluate simple numeric expressions
-                    if re.match(r'^[\d\+\-\*\/\(\)\.\s]*$', expr):
-                        return str(float(eval(expr)))
+                    cleaned_expr = expr.strip()
+                    parsed = parse_expr(cleaned_expr)
+                    logger.debug(f"Successfully parsed '{cleaned_expr}' as: {parsed}")
+                    
+                    # Try to evaluate to a numerical value if possible
+                    try:
+                        numerical = float(parsed.evalf())
+                        return f"{numerical:.6f}".rstrip('0').rstrip('.')
+                    except:
+                        return str(parsed)
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to parse expression '{expr}': {str(e)}")
                     return expr.strip()
-                except (SyntaxError, NameError, ZeroDivisionError):
-                    return expr.strip()
+
             generated_ans = clean_math_expression(generated_ans)
             correct_ans = clean_math_expression(correct_ans)
 
@@ -783,24 +820,34 @@ class SCoReTrainer:
                 cor_expr = parse_expr(correct_ans)
                 logger.info(f"Parsed generated: {gen_expr}")
                 logger.info(f"Parsed correct: {cor_expr}")
-                
-                difference = simplify(gen_expr - cor_expr)
-                logger.info(f"Simplified difference: {difference}")
-                
+                difference = None
+                if gen_expr == cor_expr:
+                    reward = 1.0
+                    trace_info["reward_computation"]["comparison_result"] = "expression_match"
+                    trace_info["reward_computation"]["final_reward"] = reward
+                elif extract_boxed_answer(generated_ans) == extract_boxed_answer(correct_ans):
+                    reward = 1.0
+                    trace_info["reward_computation"]["comparison_result"] = "boxed_answer_match"
+                    trace_info["reward_computation"]["final_reward"] = reward
+                else:
+                    difference = simplify(gen_expr - cor_expr)
+                    logger.info(f"Simplified difference: {difference}")
+                    reward = 1.0 if difference == 0 else 0.0
+                    trace_info["reward_computation"]["method_used"] = "symbolic_comparison"
+                    trace_info["reward_computation"]["comparison_result"] = str(difference)
+                    trace_info["reward_computation"]["final_reward"] = reward
+                    
                 trace_info["generated_answer"]["parsed_expr"] = str(gen_expr)
                 trace_info["correct_answer"]["parsed_expr"] = str(cor_expr)
-                trace_info["reward_computation"]["method_used"] = "symbolic_comparison"
-                trace_info["reward_computation"]["comparison_result"] = str(difference)
-                
-                # reward = 1.0 if difference == 0 else 0.0
+
                 ####################################################################### 
 
                 s1 = float(gen_expr.evalf())
                 s2 = float(cor_expr.evalf())
-
+                # reward = 0.0
                 # String comparison fallback reward calculation
                 # Based on principles of self-correction via string similarity
-                reward = 0.0
+                # reward = 0.0
                 # if generated_ans == correct_ans:
                 #     reward = 1.0
                 # else:
@@ -835,11 +882,10 @@ class SCoReTrainer:
                 # logger.info(f"Similarity score: {similarity}")
 
 
-                reward = max((1 - abs(s1 - s2) / (s2 + 1e-8)), 0)
+                # reward = max((1 - abs(s1 - s2) / (s2 + 1e-8)), 0)
 
                 ####################################################################### 
                 logger.info(f"Expression comparison reward: {reward}")
-                trace_info["reward_computation"]["final_reward"] = reward
             except (SympifyError, TypeError, ValueError) as e:
                 logger.info(f"Expression parsing failed: {str(e)}")
                 logger.info("Falling back to string comparison")
@@ -1131,9 +1177,9 @@ class SCoReTrainer:
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
                             logger.info(f"\n=== Sample {idx + 1} First Attempt ===")
-                            logger.info(f"Input:\n{inp}")
-                            logger.info(f"Model Response:\n{resp}")
-                            logger.info(f"Correct Answer:\n{corr}")
+                            # logger.info(f"Input:\n{inp}")
+                            # logger.info(f"Model Response:\n{resp}")
+                            # logger.info(f"Correct Answer:\n{corr}")
                     
                     # Create second attempt inputs
                     second_inputs, correct, tests = self.prepare_batch(
@@ -1158,8 +1204,8 @@ class SCoReTrainer:
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (prompt, resp) in enumerate(zip(second_inputs, second_responses)):
                             logger.info(f"\n=== Sample {idx + 1} Second Attempt ===")
-                            logger.info(f"Prompt:\n{prompt}")
-                            logger.info(f"Model Response:\n{resp}")
+                            # logger.info(f"Prompt:\n{prompt}")
+                            # logger.info(f"Model Response:\n{resp}")
                     
                     # Compute rewards
                     rewards = self.compute_rewards(second_responses, correct, tests)['rewards']
@@ -1274,7 +1320,7 @@ class SCoReTrainer:
                         for idx, (prompt, resp) in enumerate(zip(second_inputs, second_responses)):
                             logger.info(f"\n=== Sample {idx + 1} Second Attempt ===")
                             #logger.info(f"Prompt:\n{prompt}")
-                            logger.info(f"Model Response:\n{resp}")
+                            # logger.info(f"Model Response:\n{resp}")
 
                     # Compute reward bonus for making progress
                     progress_bonus = self.config.alpha * (second_rewards - first_rewards)
@@ -1614,7 +1660,7 @@ def main():
     # Start training and evaluation
     try:
         trainer.train()
-        # trainer.evaluate()
+        trainer.evaluate()
     except Exception as e:
         logger.critical(f"Error during training/evaluation: {e}")
         return
