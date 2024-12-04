@@ -474,7 +474,6 @@ class AdvancedModel(nn.Module):
                 num_return_sequences=num_return_sequences,
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
-                stopping_criteria=stopping_criteria,
                 no_repeat_ngram_size=3,  # Prevent repetition
                 repetition_penalty=1.2  # Penalize repetition
             )
