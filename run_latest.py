@@ -4,6 +4,7 @@ import json
 import threading
 import argparse
 import logging
+import re   
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -280,39 +281,39 @@ class AdvancedModel(nn.Module):
             logger.info("Using EOS token as PAD token.")
 
         try:
-            lora_config = LoraConfig(
-                r=4,  # Rank of the low-rank matrices
-                lora_alpha=32,  # Scaling factor
-                target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
-                lora_dropout=0.1,  # Dropout for LoRA layers
-                bias="none",  # Bias handling ("none", "all", or "lora_only")
-                task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
-            )
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,  # Enable 4-bit quantization
-                bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
-                bnb_4bit_use_double_quant=True,  # Double quantization improves accuracy
-            )
-            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto", quantization_config=bnb_config)
+            # lora_config = LoraConfig(
+            #     r=4,  # Rank of the low-rank matrices
+            #     lora_alpha=32,  # Scaling factor
+            #     target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
+            #     lora_dropout=0.1,  # Dropout for LoRA layers
+            #     bias="none",  # Bias handling ("none", "all", or "lora_only")
+            #     task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
+            # )
+            # bnb_config = BitsAndBytesConfig(
+            #     load_in_4bit=True,  # Enable 4-bit quantization
+            #     bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
+            #     bnb_4bit_use_double_quant=True,  # Double quantization improves accuracy
+            # )
+            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto",)# quantization_config=bnb_config)
             
             # self.model = load_checkpoint_and_dispatch(
             #     self.model, model_name, device_map="auto", offload_folder="offload"
             # )
-            self.model = get_peft_model(self.model, lora_config)
-            self.model.print_trainable_parameters()
-            def count_parameters(model):
-                total_params = sum(p.numel() for p in model.parameters())
-                trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-                return total_params, trainable_params
+            # self.model = get_peft_model(self.model, lora_config)
+            # self.model.print_trainable_parameters()
+            # def count_parameters(model):
+            #     total_params = sum(p.numel() for p in model.parameters())
+            #     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            #     return total_params, trainable_params
 
-            # Get total and trainable parameters
-            total_params, trainable_params = count_parameters(self.model)
+            # # Get total and trainable parameters
+            # total_params, trainable_params = count_parameters(self.model)
 
-            # Print results
-            print(f"Total parameters: {total_params:,}")
-            print(f"Trainable parameters: {trainable_params:,}")
-            print(f"Percentage of trainable parameters: {100 * trainable_params / total_params:.2f}%")
-            logger.info(f"Model loaded and moved to {device}.")
+            # # Print results
+            # print(f"Total parameters: {total_params:,}")
+            # print(f"Trainable parameters: {trainable_params:,}")
+            # print(f"Percentage of trainable parameters: {100 * trainable_params / total_params:.2f}%")
+            # logger.info(f"Model loaded and moved to {device}.")
         except Exception as e:
             logger.error(f"Error loading model {model_name}: {e}")
             raise RuntimeError(f"Failed to load model {model_name}") from e
@@ -568,22 +569,24 @@ class SCoReTrainer:
         try:
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
-                import re
-                # More flexible pattern to handle multi-line and nested braces
+                
+                                # Pattern for \boxed{}
                 pattern = r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
-                match = re.search(pattern, text)
-                if match:
-                    return match.group(1).strip()
-                # If no boxed answer found, try to extract the final answer after "Final Answer:"
+                matches = re.findall(pattern, text)
+                if matches:
+                    return matches[-1].strip()  # Return the last match
+
+                # If no \boxed{} found, check for "Final Answer:"
                 final_answer_pattern = r'Final Answer:.*?\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
-                final_match = re.search(final_answer_pattern, text, re.DOTALL)
-                if final_match:
-                    return final_match.group(1).strip()
-                # If still no match, look for any mathematical expression
+                final_matches = re.findall(final_answer_pattern, text, re.DOTALL)
+                if final_matches:
+                    return final_matches[-1].strip()  # Return the last match
+
+                # If still no match, check for any mathematical expression within \left(...)
                 math_pattern = r'\\left\((.*?)\\'
-                math_match = re.search(math_pattern, text)
-                if math_match:
-                    return math_match.group(1).strip()
+                math_matches = re.findall(math_pattern, text)
+                if math_matches:
+                    return math_matches[-1].strip()  # Return the last match
                 return None
 
             # Clean and extract answers
@@ -1333,7 +1336,7 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'selected_problems_105.json')
+        train_file = os.path.join(config.data_path, 'selected_problems_105_Level1.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
     else:
         logger.critical("Invalid task specified!")
