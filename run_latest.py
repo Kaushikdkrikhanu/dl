@@ -132,26 +132,13 @@ class Config:
 def get_math_first_turn_prompt(problem: str) -> str:
     """Generate the first turn prompt for math problems."""
     return (
-        "<|system|>You are a math expert. When you respond, respond only with the Solution of the final Problem, thinking "
-        "step by step. At the end of the Solution, when you give your final answer , write it in the form "
-        "'Final Answer: The final answer is \\boxed{answer} with the value rounded to 4 decimal places.. I hope it is correct.' Do Not use any mathematical expressions in the box."
-        "</|system|>\n"
-        f"<|user|>{problem}</|user|>\n"
-        "<|assistant|>" 
+        "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 27 Nov 2024\n\nYou are a math expert. When you respond, respond only with the Solution of the final Problem, thinking step by step. At the end of the Solution, when you give your final answer, write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"+problem+"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n" 
     )
 
 def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
     """Generate the self-correction prompt for math problems."""
     return (
-        "<|system|>There might be an error in the solution above because of lack of understanding of the question. "
-        "Please correct the error, if any, and rewrite the solution. Only output the final solution! "
-        "At the end of the Solution, when you give your final answer, write it in the form "
-        "'Final Answer: The final answer is \\boxed{answer} with the value rounded to 4 decimal places.. I hope it is correct.' Do Not use any mathematical expressions in the box."
-        "</|system|>\n"
-        f"<|user|>Problem: {problem}\n\n"
-        f"Previous solution:\n{prev_attempt}\n"
-        "Please provide a corrected solution.</|user|>\n"
-        "<|assistant|>"
+        "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 27 Nov 2024\n\nYou are a math expert. When you respond, respond only with the Solution of the final Problem, thinking step by step. At the end of the Solution, when you give your final answer, write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"+problem+"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"+prev_attempt+"<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nThere might be an error in the solution above because of lack of understanding of the question. Please correct the error, if any, and rewrite the solution. Only output the final solution! At the end of the Solution, when you give your final answer, write it in the form. Final Answer: The final answer is \\boxed{answer}. I hope it is correct.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
     )
 
 class BaseDataset(Dataset):
@@ -455,24 +442,7 @@ class AdvancedModel(nn.Module):
                 repetition_penalty=1.2  # Penalize repetition
             )
 
-            # Decode and clean responses
-            responses = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            cleaned_responses = [self.clean_response(r) for r in responses]
-            
-            # Log sample of cleaned responses for debugging
-            if len(cleaned_responses) > 0:
-                logger.debug(f"Sample cleaned response: {cleaned_responses[0][:200]}...")
-
-            # Re-encode cleaned responses
-            cleaned_encodings = self.tokenizer(
-                cleaned_responses,
-                return_tensors='pt',
-                padding=True,
-                truncation=True,
-                max_length=max_length
-            ).to(self.device)
-
-            return cleaned_encodings['input_ids']
+            return outputs
 
         except Exception as e:
             logger.error(f"Error during text generation: {e}")
