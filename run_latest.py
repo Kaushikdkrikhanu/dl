@@ -796,8 +796,8 @@ class SCoReTrainer:
                 # reward = 1.0 if difference == 0 else 0.0
                 ####################################################################### 
 
-                s1 = gen_expr
-                s2 = cor_expr
+                s1 = float(gen_expr.evalf())
+                s2 = float(cor_expr.evalf())
 
                 # String comparison fallback reward calculation
                 # Based on principles of self-correction via string similarity
@@ -873,7 +873,9 @@ class SCoReTrainer:
             def convert_sympy(obj):
                 if hasattr(obj, 'evalf'):  # Check if it's a sympy object
                     return float(obj.evalf())
-                return obj
+                elif isinstance(obj, (int, float)):
+                    return float(obj)
+                return str(obj)  # Convert other types to strings for safety
 
             # Recursively convert all values in the dictionary
             def convert_dict(d):
