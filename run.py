@@ -4,6 +4,7 @@ import json
 import threading
 import argparse
 import logging
+import re   
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -34,6 +35,7 @@ from sympy import simplify, SympifyError
 from sympy.parsing.sympy_parser import parse_expr
 import ast
 import wandb
+from datetime import datetime
 
 # Initialize NLTK
 try:
@@ -85,8 +87,8 @@ class Config:
     batch_size: int = 1
     max_seq_len: int = 2048
     max_new_tokens: int = 2048
-    num_epochs_stage_one: int = 1
-    num_epochs_stage_two: int = 1
+    num_epochs_stage_one: int = 25
+    num_epochs_stage_two: int = 25
 
     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device: torch.device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -106,9 +108,6 @@ class Config:
     max_eval_samples: int = 500
     mixed_precision: bool = False
     save_total_limit: int = 2
-    compute_bleu: bool = False
-    compute_rouge: bool = False
-    compute_cyclomatic_complexity: bool = False
 
     def validate(self) -> None:
         """
@@ -134,29 +133,14 @@ class Config:
 def get_math_first_turn_prompt(problem: str) -> str:
     """Generate the first turn prompt for math problems."""
     return (
-        "<|system|>You are a math expert. When you respond, respond only with the Solution of the final Problem, thinking "
-        "step by step. At the end of the Solution, when you give your final answer, write it in the form "
-        "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
-        "</|system|>\n"
-        f"<|user|>{problem}</|user|>\n"
-        "<|assistant|>" 
+        "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 27 Nov 2024\n\nYou are a math expert. When you respond, respond only with the Solution of the final Problem, thinking step by step. At the end of the Solution, when you give your final answer, write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"+problem+"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n" 
     )
 
 def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
     """Generate the self-correction prompt for math problems."""
     return (
-        "<|system|>There might be an error in the solution above because of lack of understanding of the question. "
-        "Please correct the error, if any, and rewrite the solution. Only output the final solution! "
-        "At the end of the Solution, when you give your final answer, write it in the form "
-        "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
-        "</|system|>\n"
-        f"<|user|>Problem: {problem}\n\n"
-        f"Previous solution:\n{prev_attempt}\n"
-        "Please provide a corrected solution.</|user|>\n"
-        "<|assistant|>"
+        "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 27 Nov 2024\n\nYou are a math expert. When you respond, respond only with the Solution of the final Problem, thinking step by step. At the end of the Solution, when you give your final answer, write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"+problem+"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"+prev_attempt+"<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nThere might be an error in the solution above because of lack of understanding of the question. Please correct the error, if any, and rewrite the solution. Only output the final solution! At the end of the Solution, when you give your final answer, write it in the form. Final Answer: The final answer is \\boxed{answer}. I hope it is correct.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
     )
-
-
 
 class BaseDataset(Dataset):
     """
@@ -186,6 +170,8 @@ class BaseDataset(Dataset):
                 return get_math_first_turn_prompt(item['problem'])
             else:
                 return get_math_correction_prompt(item['problem'], prev_attempt)
+        else:
+            raise NotImplementedError(f"Task {self.task} is not implemented")
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         try:
@@ -295,39 +281,39 @@ class AdvancedModel(nn.Module):
             logger.info("Using EOS token as PAD token.")
 
         try:
-            lora_config = LoraConfig(
-                r=4,  # Rank of the low-rank matrices
-                lora_alpha=32,  # Scaling factor
-                target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
-                lora_dropout=0.1,  # Dropout for LoRA layers
-                bias="none",  # Bias handling ("none", "all", or "lora_only")
-                task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
-            )
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,  # Enable 4-bit quantization
-                bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
-                bnb_4bit_use_double_quant=True,  # Double quantization improves accuracy
-            )
-            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto", quantization_config=bnb_config)
+            # lora_config = LoraConfig(
+            #     r=4,  # Rank of the low-rank matrices
+            #     lora_alpha=32,  # Scaling factor
+            #     target_modules=["q_proj", "v_proj"],  # Modules to apply LoRA (e.g., attention layers)
+            #     lora_dropout=0.1,  # Dropout for LoRA layers
+            #     bias="none",  # Bias handling ("none", "all", or "lora_only")
+            #     task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
+            # )
+            # bnb_config = BitsAndBytesConfig(
+            #     load_in_4bit=True,  # Enable 4-bit quantization
+            #     bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
+            #     bnb_4bit_use_double_quant=True,  # Double quantization improves accuracy
+            # )
+            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto",)# quantization_config=bnb_config)
             
             # self.model = load_checkpoint_and_dispatch(
             #     self.model, model_name, device_map="auto", offload_folder="offload"
             # )
-            self.model = get_peft_model(self.model, lora_config)
-            self.model.print_trainable_parameters()
-            def count_parameters(model):
-                total_params = sum(p.numel() for p in model.parameters())
-                trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-                return total_params, trainable_params
+            # self.model = get_peft_model(self.model, lora_config)
+            # self.model.print_trainable_parameters()
+            # def count_parameters(model):
+            #     total_params = sum(p.numel() for p in model.parameters())
+            #     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            #     return total_params, trainable_params
 
-            # Get total and trainable parameters
-            total_params, trainable_params = count_parameters(self.model)
+            # # Get total and trainable parameters
+            # total_params, trainable_params = count_parameters(self.model)
 
-            # Print results
-            print(f"Total parameters: {total_params:,}")
-            print(f"Trainable parameters: {trainable_params:,}")
-            print(f"Percentage of trainable parameters: {100 * trainable_params / total_params:.2f}%")
-            logger.info(f"Model loaded and moved to {device}.")
+            # # Print results
+            # print(f"Total parameters: {total_params:,}")
+            # print(f"Trainable parameters: {trainable_params:,}")
+            # print(f"Percentage of trainable parameters: {100 * trainable_params / total_params:.2f}%")
+            # logger.info(f"Model loaded and moved to {device}.")
         except Exception as e:
             logger.error(f"Error loading model {model_name}: {e}")
             raise RuntimeError(f"Failed to load model {model_name}") from e
@@ -457,24 +443,7 @@ class AdvancedModel(nn.Module):
                 repetition_penalty=1.2  # Penalize repetition
             )
 
-            # Decode and clean responses
-            responses = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            cleaned_responses = [self.clean_response(r) for r in responses]
-            
-            # Log sample of cleaned responses for debugging
-            if len(cleaned_responses) > 0:
-                logger.debug(f"Sample cleaned response: {cleaned_responses[0][:200]}...")
-
-            # Re-encode cleaned responses
-            cleaned_encodings = self.tokenizer(
-                cleaned_responses,
-                return_tensors='pt',
-                padding=True,
-                truncation=True,
-                max_length=max_length
-            ).to(self.device)
-
-            return cleaned_encodings['input_ids']
+            return outputs
 
         except Exception as e:
             logger.error(f"Error during text generation: {e}")
@@ -521,13 +490,11 @@ class SCoReTrainer:
         if config.task == 'MATH':
             self.smoothing = SmoothingFunction()
 
-
         try:
             wandb.login(key="5846629ab2a2094c5948b4c032301fdae772fbb0", relogin=True) 
-            
             wandb.init(
                 project="score-training",
-                name=f"Run-{config.task}-{config.model_variant}-{config.seed}",
+                name=f"Run-{config.task}-{config.model_variant}-{config.seed}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
                 config={
                     "task": config.task,
                     "model_variant": config.model_variant,
@@ -564,7 +531,7 @@ class SCoReTrainer:
             logger.error(f"Error computing KL divergence: {e}")
             raise RuntimeError("KL divergence computation failed.") from e
 
-    def reward_function_math(self, generated: str, correct: str) -> Tuple[float, float, Dict[str, float]]:
+    def reward_function_math(self, generated: str, correct: str) -> Tuple[float]:
         """
         Compute rewards for math tasks.
 
@@ -602,22 +569,24 @@ class SCoReTrainer:
         try:
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
-                import re
-                # More flexible pattern to handle multi-line and nested braces
+                
+                                # Pattern for \boxed{}
                 pattern = r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
-                match = re.search(pattern, text)
-                if match:
-                    return match.group(1).strip()
-                # If no boxed answer found, try to extract the final answer after "Final Answer:"
+                matches = re.findall(pattern, text)
+                if matches:
+                    return matches[-1].strip()  # Return the last match
+
+                # If no \boxed{} found, check for "Final Answer:"
                 final_answer_pattern = r'Final Answer:.*?\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
-                final_match = re.search(final_answer_pattern, text, re.DOTALL)
-                if final_match:
-                    return final_match.group(1).strip()
-                # If still no match, look for any mathematical expression
+                final_matches = re.findall(final_answer_pattern, text, re.DOTALL)
+                if final_matches:
+                    return final_matches[-1].strip()  # Return the last match
+
+                # If still no match, check for any mathematical expression within \left(...)
                 math_pattern = r'\\left\((.*?)\\'
-                math_match = re.search(math_pattern, text)
-                if math_match:
-                    return math_match.group(1).strip()
+                math_matches = re.findall(math_pattern, text)
+                if math_matches:
+                    return math_matches[-1].strip()  # Return the last match
                 return None
 
             # Clean and extract answers
@@ -630,7 +599,7 @@ class SCoReTrainer:
 
             if generated_ans is None:
                 logger.info("No boxed answer found in generated answer")
-                return 0.0, 0.0, {'f': 0.0}
+                return 0.0
 
             # Clean the answers
             for char in [' ', '$', '\\n', '\\', '{', '}']:
@@ -672,88 +641,63 @@ class SCoReTrainer:
                 # String comparison fallback reward calculation
                 # Based on principles of self-correction via string similarity
                 reward = 0.0
-                if generated_ans == correct_ans:
-                    reward = 1.0
-                else:
-                    # Compute Levenshtein distance for partial credit
-                    def levenshtein_distance(s1, s2):
-                        if len(s1) < len(s2):
-                            return levenshtein_distance(s2, s1)
-                        if len(s2) == 0:
-                            return len(s1)
+                # if generated_ans == correct_ans:
+                #     reward = 1.0
+                # else:
+                #     # Compute Levenshtein distance for partial credit
+                #     def levenshtein_distance(s1, s2):
+                #         if len(s1) < len(s2):
+                #             return levenshtein_distance(s2, s1)
+                #         if len(s2) == 0:
+                #             return len(s1)
 
-                        previous_row = range(len(s2) + 1)
-                        for i, c1 in enumerate(s1):
-                            current_row = [i + 1]
-                            for j, c2 in enumerate(s2):
-                                insertions = previous_row[j + 1] + 1
-                                deletions = current_row[j] + 1
-                                substitutions = previous_row[j] + (c1 != c2)
-                                current_row.append(min(insertions, deletions, substitutions))
-                            previous_row = current_row
+                #         previous_row = range(len(s2) + 1)
+                #         for i, c1 in enumerate(s1):
+                #             current_row = [i + 1]
+                #             for j, c2 in enumerate(s2):
+                #                 insertions = previous_row[j + 1] + 1
+                #                 deletions = current_row[j] + 1
+                #                 substitutions = previous_row[j] + (c1 != c2)
+                #                 current_row.append(min(insertions, deletions, substitutions))
+                #             previous_row = current_row
 
-                        return previous_row[-1]
+                #         return previous_row[-1]
 
-                    # Normalize the Levenshtein distance
-                    max_len = max(len(generated_ans), len(correct_ans))
-                    distance = levenshtein_distance(generated_ans, correct_ans)
-                    similarity = 1 - (distance / max_len)
+                #     # Normalize the Levenshtein distance
+                #     max_len = max(len(generated_ans), len(correct_ans))
+                #     distance = levenshtein_distance(generated_ans, correct_ans)
+                #     similarity = 1 - (distance / max_len)
                     
-                    # Exponential reward to emphasize correctness
-                    reward = max(0, similarity ** 2)
+                #     # Exponential reward to emphasize correctness
+                #     reward = max(0, similarity ** 2)
 
-                logger.info(f"String comparison distance: {distance}")
-                logger.info(f"Similarity score: {similarity}")
+                # logger.info(f"String comparison distance: {distance}")
+                # logger.info(f"Similarity score: {similarity}")
+
+
+                reward = max((1 - abs(s1 - s2) / (s2 + 1e-8)), 0)
+
                 ####################################################################### 
                 logger.info(f"Expression comparison reward: {reward}")
             except (SympifyError, TypeError, ValueError) as e:
                 logger.info(f"Expression parsing failed: {str(e)}")
-            #     logger.info("Falling back to string comparison")
-                
-            #     trace_info["reward_computation"]["method_used"] = "string_comparison"
-            #     trace_info["reward_computation"]["error"] = str(e)
-            #     reward = 1.0 if generated_ans == correct_ans else 0.0
-            #     logger.info(f"String comparison reward: {reward}")
-
-            # Compute BLEU score if enabled
-            if self.config.compute_bleu:
-                try:
-                    bleu = sentence_bleu(
-                        [correct.split()],
-                        generated.split(),
-                        smoothing_function=self.smoothing.method1
-                    )
-                    trace_info["metrics"]["bleu"] = bleu
-                except Exception as e:
-                    logger.error(f"Error computing BLEU score: {e}")
-                    bleu = 0.0
-                    trace_info["metrics"]["bleu"] = bleu
-
-            # Compute ROUGE score if enabled
-            if self.config.compute_rouge:
-                try:
-                    rouge_scores = self.rouge.get_scores(generated, correct)[0]
-                    rouge = {'f': rouge_scores.get('f', 0.0)}
-                    trace_info["metrics"]["rouge"] = rouge_scores
-                except Exception as e:
-                    logger.error(f"Error computing ROUGE score: {e}")
-                    trace_info["metrics"]["rouge"] = {"error": str(e)}
-                    rouge = {'f': 0.0}
+                logger.info("Falling back to string comparison")
+                trace_info["reward_computation"]["method_used"] = "string_comparison"
+                trace_info["reward_computation"]["error"] = str(e)
+                reward = 1.0 if generated_ans == correct_ans else 0.0
+                logger.info(f"String comparison reward: {reward}")
 
         except Exception as e:
             trace_info["reward_computation"]["error"] = str(e)
             logger.error(f"Error in reward computation: {e}")
             reward = 0.0
-            bleu = 0.0
-            rouge = {'f': 0.0}
+     
 
         logger.info(f"=== Final Reward Metrics ===")
         logger.info(f"Reward: {reward}")
-        logger.info(f"BLEU: {bleu}")
-        logger.info(f"ROUGE: {rouge}")
         logger.info("===========================\n")   
         self._save_trace(trace_info)
-        return reward, bleu, rouge
+        return reward
 
     def _save_trace(self, trace_info: Dict) -> None:
         """
@@ -804,44 +748,6 @@ class SCoReTrainer:
             logger.error(f"Error during code execution thread: {e}")
             return False
 
-    def compute_cyclomatic_complexity(self, code: str) -> float:
-        """
-        Compute cyclomatic complexity of the given code.
-
-        Args:
-            code (str): Code to analyze.
-
-        Returns:
-            float: Average cyclomatic complexity.
-        """
-        try:
-            complexity = radon_complexity.cc_visit(code)
-            avg_complexity = np.mean([block.complexity for block in complexity]) if complexity else 0.0
-            logger.debug(f"Cyclomatic complexity: {avg_complexity}")
-            return avg_complexity
-        except SyntaxError as e:
-            logger.warning(f"SyntaxError while computing cyclomatic complexity: {e}")
-            return 0.0
-        except Exception as e:
-            logger.error(f"Unexpected error computing cyclomatic complexity: {e}")
-            return 0.0
-
-    def reward_function_code(self, code: str, test: str) -> Tuple[float, float]:
-        """
-        Compute rewards for code tasks.
-
-        Args:
-            code (str): Generated code.
-            test (str): Test case code.
-
-        Returns:
-            Tuple containing reward and cyclomatic complexity.
-        """
-        success = self.safe_execute_code(code, test)
-        cyclomatic = self.compute_cyclomatic_complexity(code) if self.config.compute_cyclomatic_complexity else 0.0
-        reward = 1.0 if success else 0.0
-        logger.debug(f"Code reward: {reward}, Cyclomatic complexity: {cyclomatic}")
-        return reward, cyclomatic
 
     def compute_rewards(
         self,
@@ -861,43 +767,20 @@ class SCoReTrainer:
             RewardsDict: Dictionary containing rewards and metrics.
         """
         rewards = []
-        bleu = []
-        rouge = []
-        cyclomatic = []
 
         for i, gen in enumerate(generated):
             try:
                 if self.config.task == 'MATH':
-                    r, b, ro = self.reward_function_math(gen, correct[i])
+                    r = self.reward_function_math(gen, correct[i])
                     rewards.append(r)
-                    bleu.append(b)
-                    rouge.append(ro)
-                elif self.config.task == 'CODE':
-                    test = test_cases[i] if test_cases and i < len(test_cases) else ''
-                    if test:
-                        r, c = self.reward_function_code(gen, test)
-                    else:
-                        logger.warning(f"Missing test case for CODE task at index {i}. Assigning zero reward.")
-                        r, c = 0.0, 0.0
-                    rewards.append(r)
-                    cyclomatic.append(c)
+
             except Exception as e:
                 logger.error(f"Error computing rewards for index {i}: {e}")
                 rewards.append(0.0)
-                if self.config.task == 'MATH':
-                    bleu.append(0.0)
-                    rouge.append({})
-                elif self.config.task == 'CODE':
-                    cyclomatic.append(0.0)
-
+  
         rewards_tensor = torch.tensor(rewards, device=self.config.device)
         logger.debug(f"Rewards computed: {rewards}")
-        return {
-            'rewards': rewards_tensor,
-            'bleu': bleu,
-            'rouge': rouge,
-            'cyclomatic': cyclomatic
-        }
+        return {'rewards': rewards_tensor}
 
     def compute_edit_distance_ratio(self, s1: str, s2: str) -> float:
         """
@@ -943,20 +826,6 @@ class SCoReTrainer:
                 else:
                     inputs = get_math_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_math_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
                 tests = None
-            elif self.task == 'CODE':
-                if isinstance(batch, dict):
-                    problem = batch.get('text', batch.get('prompt', ''))
-                    correct = batch.get('code', batch.get('canonical_solution', ''))
-                    tests = batch.get('test_list', batch.get('test', ''))
-                else:
-                    problem = [item.get('text', item.get('prompt', '')) for item in batch]
-                    correct = [item.get('code', item.get('canonical_solution', '')) for item in batch]
-                    tests = [item.get('test_list', item.get('test', '')) for item in batch]
-                
-                if turn == 1:
-                    inputs = get_code_first_turn_prompt(problem) if isinstance(problem, str) else [get_code_first_turn_prompt(p) for p in problem]
-                else:
-                    inputs = get_code_correction_prompt(problem, prev_attempts) if isinstance(problem, str) else [get_code_correction_prompt(p, pa) for p, pa in zip(problem, prev_attempts)]
             else:
                 # Handle other tasks
                 raise NotImplementedError("Not implemented for this task")
@@ -1007,11 +876,6 @@ class SCoReTrainer:
                 
                 # Edit distance metrics
                 "train/edit_distance_ratio": np.mean(metrics.get("edit_distance_ratios", [0.0])),
-                
-                # Task-specific metrics
-                "train/bleu_score": np.mean(metrics.get("bleu_scores", [0.0])) if self.config.compute_bleu else None,
-                "train/rouge_score": np.mean(metrics.get("rouge_scores", [0.0])) if self.config.compute_rouge else None,
-                "train/cyclomatic_complexity": np.mean(metrics.get("cyclomatic_scores", [0.0])) if self.config.compute_cyclomatic_complexity else None
             }
 
             # Remove None values
@@ -1075,6 +939,8 @@ class SCoReTrainer:
                     first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=0.7)
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     
+                    # maybe this is needed too in stage_two?
+                    first_responses = [first_response.split("assistant\n\n", 1)[-1] for first_response in first_responses]
                     # Print first attempt details
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
@@ -1119,32 +985,6 @@ class SCoReTrainer:
                     # Total loss is negative reward for second attempt plus KL penalty on first attempt
                     loss = -rewards.mean() + kl_loss
 
-                    try:
-                        # Collect metrics
-                        metrics = {
-                            "total_loss": loss.item(),
-                            "kl_loss": kl_loss.item(),
-                            "reward_loss": -rewards.mean(),
-                            "rewards_t1": torch.zeros_like(rewards),  # First attempt has no rewards in Stage I
-                            "rewards_t2": rewards,
-                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]
-                        }
-
-                        # Add task-specific metrics
-                        if self.config.task == 'MATH':
-                            if self.config.compute_bleu:
-                                metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
-                            if self.config.compute_rouge:
-                                metrics["rouge_scores"] = [r.get('f', 0.0) for r in self.compute_rewards(second_responses, correct, tests)['rouge']]
-                        elif self.config.task == 'CODE' and self.config.compute_cyclomatic_complexity:
-                            metrics["cyclomatic_scores"] = self.compute_rewards(second_responses, correct, tests)['cyclomatic']
-
-                        # Log metrics
-                        self.log_metrics(metrics, step=self.global_step)
-
-                    except Exception as e:
-                        logger.error(f"Error collecting or logging metrics in Stage I: {e}")
-
             except Exception as e:
                 logger.error(f"Error during Stage I forward pass: {e}")
                 continue
@@ -1172,6 +1012,22 @@ class SCoReTrainer:
 
             if self.global_step % self.config.logging_steps == 0:
                 logger.info(f"Stage I - Step {self.global_step}, Loss: {loss.item():.4f}")
+            
+            try:
+                # Collect metrics
+                metrics = {
+                    "total_loss": loss.item(),
+                    "kl_loss": kl_loss.item(),
+                    "reward_loss": -rewards.mean(),
+                    "rewards_t1": torch.zeros_like(rewards),  # First attempt has no rewards in Stage I
+                    "rewards_t2": rewards,
+                    "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]
+                }
+                # Log metrics
+                self.log_metrics(metrics, step=self.global_step)
+
+            except Exception as e:
+                logger.error(f"Error collecting or logging metrics in Stage I: {e}")
 
     def stage_two(self) -> None:
         """
@@ -1253,33 +1109,6 @@ class SCoReTrainer:
                     # Final loss
                     loss = -total_rewards.mean() + kl_loss
 
-                    try:
-                        # Collect metrics
-                        metrics = {
-                            "total_loss": loss.item(),
-                            "kl_loss": kl_loss.item(),
-                            "reward_loss": -(total_rewards.mean()),
-                            "rewards_t1": first_rewards,
-                            "rewards_t2": second_rewards,
-                            "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]  # Fixed variable names
-                        }
-
-                        # Add task-specific metrics
-                        if self.config.task == 'MATH':
-                            if self.config.compute_bleu:
-                                metrics["bleu_scores"] = self.compute_rewards(second_responses, correct, tests)['bleu']
-                            if self.config.compute_rouge:
-                                metrics["rouge_scores"] = [r.get('f', 0.0) for r in 
-                                    self.compute_rewards(second_responses, correct, tests)['rouge']]
-                        elif self.config.task == 'CODE' and self.config.compute_cyclomatic_complexity:
-                            metrics["cyclomatic_scores"] = self.compute_rewards(second_responses, correct, tests)['cyclomatic']
-
-                        # Log metrics
-                        self.log_metrics(metrics, step=self.global_step)
-
-                    except Exception as e:
-                        logger.error(f"Error collecting or logging metrics in Stage II: {e}")
-
 
             except Exception as e:
                 logger.error(f"Error during Stage II forward pass: {e}")
@@ -1311,6 +1140,22 @@ class SCoReTrainer:
                     f"Stage II - Step {self.global_step}, Loss: {loss.item():.4f}, "
                     f"Total Reward: {total_rewards.mean().item():.4f}"
                 )
+            try:
+                # Collect metrics
+                metrics = {
+                    "total_loss": loss.item(),
+                    "kl_loss": kl_loss.item(),
+                    "reward_loss": -(total_rewards.mean()),
+                    "rewards_t1": first_rewards,
+                    "rewards_t2": second_rewards,
+                    "edit_distance_ratios": [self.compute_edit_distance_ratio(f, s) for f, s in zip(first_responses, second_responses)]  # Fixed variable names
+                }
+
+                # Log metrics
+                self.log_metrics(metrics, step=self.global_step)
+
+            except Exception as e:
+                logger.error(f"Error collecting or logging metrics in Stage II: {e}")
 
     def __del__(self):
         """Cleanup wandb on deletion."""
@@ -1327,7 +1172,6 @@ class SCoReTrainer:
         self.model.eval()
         total_correct_t1, total_correct_t2, total_samples = 0.0, 0.0, 0
         delta_i_to_c, delta_c_to_i = 0, 0
-        bleu_scores, rouge_scores, cyclomatic_complexities = [], [], []
 
         try:
             with torch.no_grad():
@@ -1390,20 +1234,6 @@ class SCoReTrainer:
                                 delta_c_to_i += 1
                             total_samples += 1
 
-                            if self.config.task == 'MATH':
-                                if self.config.compute_bleu:
-                                    bleu_first = self.compute_rewards([first[i]], [correct[i]], tests)['bleu'][0]
-                                    bleu_second = self.compute_rewards([second[i]], [correct[i]], tests)['bleu'][0]
-                                    bleu_scores.extend([bleu_first, bleu_second])
-                                if self.config.compute_rouge:
-                                    rouge_first = self.compute_rewards([first[i]], [correct[i]], tests)['rouge'][0].get('f', 0.0)
-                                    rouge_second = self.compute_rewards([second[i]], [correct[i]], tests)['rouge'][0].get('f', 0.0)
-                                    rouge_scores.extend([rouge_first, rouge_second])
-                            elif self.config.task == 'CODE':
-                                if self.config.compute_cyclomatic_complexity:
-                                    cyclomatic = self.compute_rewards([second[i]], [correct[i]], tests)['cyclomatic'][0]
-                                    cyclomatic_complexities.append(cyclomatic)
-
                             # Compute edit distance ratio
                             ratio = self.compute_edit_distance_ratio(first[i], second[i])
                             self.edit_distance_ratios.append(ratio)
@@ -1422,18 +1252,6 @@ class SCoReTrainer:
             logger.info(f"Δ(t1,t2): {delta:.4f}")
             logger.info(f"Δ_i→c(t1,t2): {delta_i_to_c_frac:.4f}")
             logger.info(f"Δ_c→i(t1,t2): {delta_c_to_i_frac:.4f}")
-
-            if self.config.task == 'MATH':
-                if self.config.compute_bleu and bleu_scores:
-                    avg_bleu = np.mean(bleu_scores)
-                    logger.info(f"Average BLEU Score: {avg_bleu:.4f}")
-                if self.config.compute_rouge and rouge_scores:
-                    avg_rouge = np.mean([score for score in rouge_scores if score is not None])
-                    logger.info(f"Average ROUGE-F1 Score: {avg_rouge:.4f}")
-            elif self.config.task == 'CODE':
-                if self.config.compute_cyclomatic_complexity and cyclomatic_complexities:
-                    avg_cyclomatic = np.mean(cyclomatic_complexities)
-                    logger.info(f"Average Cyclomatic Complexity: {avg_cyclomatic:.4f}")
 
             self.plot_reward_history()
             self.plot_edit_distance_ratios()
@@ -1491,9 +1309,6 @@ def main():
     parser.add_argument('--data_path', type=str, default='./data', help="Path to the data directory")
     parser.add_argument('--output_dir', type=str, default='./outputs', help="Directory to save outputs")
     parser.add_argument('--mixed_precision', action='store_true', help="Enable mixed precision training")
-    parser.add_argument('--no_bleu', action='store_false', dest='compute_bleu', help="Disable BLEU score computation")
-    parser.add_argument('--no_rouge', action='store_false', dest='compute_rouge', help="Disable ROUGE score computation")
-    parser.add_argument('--no_cyclomatic', action='store_false', dest='compute_cyclomatic_complexity', help="Disable cyclomatic complexity computation")
     args = parser.parse_args()
 
     # Initialize configuration
@@ -1504,9 +1319,6 @@ def main():
         data_path=args.data_path,
         output_dir=args.output_dir,
         mixed_precision=args.mixed_precision,
-        compute_bleu=args.compute_bleu,
-        compute_rouge=args.compute_rouge,
-        compute_cyclomatic_complexity=args.compute_cyclomatic_complexity,
         logging_steps=1
     )
 
@@ -1524,13 +1336,10 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'selected_problems_105.json')
+        train_file = os.path.join(config.data_path, 'selected_problems_105_Level1.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
-    elif config.task == 'CODE':
-        train_file = os.path.join(config.data_path, 'mbpp.jsonl')
-        val_file = os.path.join(config.data_path, 'mbpp.jsonl')
     else:
-        logger.critical("Invalid task specified. Choose between 'MATH' and 'CODE'.")
+        logger.critical("Invalid task specified!")
         return
 
     # Check data file existence
@@ -1542,9 +1351,6 @@ def main():
     # Load datasets
     try:
         if config.task == 'MATH':
-            train_data = load_json(train_file, 1000)
-            val_data = load_json(val_file, 100)
-        elif config.task == 'CODE':
             train_data = load_json(train_file, 1000)
             val_data = load_json(val_file, 100)
         train_dataset = BaseDataset(train_data, task=config.task) 
