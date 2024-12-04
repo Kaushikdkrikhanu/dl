@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing_extensions import TypedDict
 from peft import PeftModel, LoraConfig, get_peft_model
-# from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 from transformers import LlamaForCausalLM, LlamaTokenizer, BitsAndBytesConfig
 
 import torch
@@ -129,17 +129,51 @@ class Config:
                 logger.error(f"Failed to create output directory: {e}")
                 raise
 
-
 def get_math_first_turn_prompt(problem: str) -> str:
     """Generate the first turn prompt for math problems."""
     return (
-        "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 27 Nov 2024\n\nYou are a math expert. When you respond, respond only with the Solution of the final Problem, thinking step by step. At the end of the Solution, when you give your final answer, write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"+problem+"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n" 
+        "<|begin_of_text|>"
+        "<|start_header_id|>system"
+        "<|end_header_id|>\n"
+        "You are a math expert. When you respond, respond only with the Solution of the final Problem, "
+        "thinking step by step. At the end of the Solution, when you give your final answer, "
+        "write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
+        "<|eot_id|>"
+        "<|start_header_id|>user"
+        "<|end_header_id|>\n"
+        f"{problem}"
+        "<|eot_id|>"
+        "<|start_header_id|>assistant"
+        "<|end_header_id|>\n"
     )
 
 def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
     """Generate the self-correction prompt for math problems."""
     return (
-        "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 27 Nov 2024\n\nYou are a math expert. When you respond, respond only with the Solution of the final Problem, thinking step by step. At the end of the Solution, when you give your final answer, write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n"+problem+"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"+prev_attempt+"<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nThere might be an error in the solution above because of lack of understanding of the question. Please correct the error, if any, and rewrite the solution. Only output the final solution! At the end of the Solution, when you give your final answer, write it in the form. Final Answer: The final answer is \\boxed{answer}. I hope it is correct.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+        "<|begin_of_text|>"
+        "<|start_header_id|>system"
+        "<|end_header_id|>\n"
+        "You are a math expert. When you respond, respond only with the Solution of the final Problem, "
+        "thinking step by step. At the end of the Solution, when you give your final answer, "
+        "write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
+        "<|eot_id|>"
+        "<|start_header_id|>user"
+        "<|end_header_id|>\n"
+        f"{problem}"
+        "<|eot_id|>"
+        "<|start_header_id|>assistant"
+        "<|end_header_id|>\n"
+        f"{prev_attempt}"
+        "<|eot_id|>"
+        "<|start_header_id|>user"
+        "<|end_header_id|>\n"
+        "There might be an error in the solution above because of lack of understanding of the question. "
+        "Please correct the error, if any, and rewrite the solution. Only output the final solution! "
+        "At the end of the Solution, when you give your final answer, write it in the form "
+        "'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
+        "<|eot_id|>"
+        "<|start_header_id|>assistant"
+        "<|end_header_id|>\n"
     )
 
 class BaseDataset(Dataset):
@@ -262,14 +296,16 @@ class AdvancedModel(nn.Module):
                 use_fast=True,
                 padding_side='left'
             )
-            self.system_marker = "<|system|>"
-            self.user_marker = "<|user|>"
-            self.assistant_marker = "<|assistant|>"
+            self.system_marker = "<|start_header_id|>system<|end_header_id|>"
+            self.user_marker = "<|start_header_id|>user<|end_header_id|>"
+            self.assistant_marker = "<|start_header_id|>assistant<|end_header_id|>"
+            self.eot_marker = "<|eot_id|>"
+            
             self.stop_sequences = [
                 self.system_marker,
                 self.user_marker,
-                "Previous Attempt:",
-                "Instructions:"
+                self.eot_marker,
+                "<|end_of_text|>"
             ]
             logger.info(f"Tokenizer loaded for {model_name}.")
         except Exception as e:
@@ -294,7 +330,7 @@ class AdvancedModel(nn.Module):
             #     bnb_4bit_quant_type="nf4",  # NormalFloat4 quantization (recommended for LLMs)
             #     bnb_4bit_use_double_quant=True,  # Double quantization improves accuracy
             # )
-            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto",)# quantization_config=bnb_config)
+            self.model = LlamaForCausalLM.from_pretrained(model_name, device_map="auto")#, quantization_config=bnb_config)
             
             # self.model = load_checkpoint_and_dispatch(
             #     self.model, model_name, device_map="auto", offload_folder="offload"
@@ -534,21 +570,14 @@ class SCoReTrainer:
     def reward_function_math(self, generated: str, correct: str) -> Tuple[float]:
         """
         Compute rewards for math tasks.
-
-        Args:
-            generated (str): Generated answer.
-            correct (str): Correct answer.
-
-        Returns:
-            Tuple containing reward, BLEU score, and ROUGE scores.
         """
-        # Initialize default values
         reward = 0.0
 
         logger.info(f"\n=== Math Reward Computation ===")
         trace_info = {
             "generated_answer": {
                 "raw": generated,
+                "assistant_response": None,
                 "boxed": None,
                 "cleaned": None,
                 "parsed_expr": None
@@ -567,31 +596,61 @@ class SCoReTrainer:
             }
         }
         try:
+            def extract_assistant_response(text: str) -> str:
+                # Split by 'assistant' marker
+                parts = text.split("assistant\n")
+                if len(parts) <= 1:
+                    return text.strip()
+                    
+                # Get the last assistant response
+                last_response = parts[-1]
+                
+                # Remove everything after EOT marker if present
+                if "user\n" in last_response:
+                    last_response = last_response.split("user\n")[0]
+                    
+                return last_response.strip()
+
+            # Extract assistant responses
+            generated_ans = extract_assistant_response(generated)
+            correct_ans = extract_assistant_response(correct)
+            
+            trace_info["generated_answer"]["assistant_response"] = generated_ans
+            
             # Extract answer from \boxed{} format
             def extract_boxed_answer(text: str) -> Optional[str]:
+                """
+                Extract answer from \boxed{} format with improved pattern matching.
+                """
+                # Try different boxed formats
+                patterns = [
+                    r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}',  # Standard \boxed{...}
+                    r'\\boxed{{([^{}]*(?:{[^{}]*})*[^{}]*?)}}',  # Double braces \boxed{{...}}
+                    r'Final Answer:.*?\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}',  # With Final Answer prefix
+                    r'\\textbf{\s*}(\d+)',  # \textbf{ }number format
+                    r'Final Answer:\s*\\textbf{\s*}(\d+)',  # Final Answer:\textbf{ }number
+                ]
                 
-                                # Pattern for \boxed{}
-                pattern = r'\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
-                matches = re.findall(pattern, text)
+                for pattern in patterns:
+                    matches = re.findall(pattern, text, re.DOTALL)
+                    if matches:
+                        return matches[-1].strip()
+                
+                # If no boxed format found, try to find a final answer in plain text
+                final_answer_pattern = r'Final Answer:\s*(\d+)'
+                matches = re.findall(final_answer_pattern, text)
                 if matches:
-                    return matches[-1].strip()  # Return the last match
-
-                # If no \boxed{} found, check for "Final Answer:"
-                final_answer_pattern = r'Final Answer:.*?\\boxed{([^{}]*(?:{[^{}]*})*[^{}]*)}'
-                final_matches = re.findall(final_answer_pattern, text, re.DOTALL)
-                if final_matches:
-                    return final_matches[-1].strip()  # Return the last match
-
-                # If still no match, check for any mathematical expression within \left(...)
-                math_pattern = r'\\left\((.*?)\\'
-                math_matches = re.findall(math_pattern, text)
-                if math_matches:
-                    return math_matches[-1].strip()  # Return the last match
+                    return matches[-1].strip()
+                    
                 return None
 
-            # Clean and extract answers
-            generated_ans = extract_boxed_answer(generated)
-            correct_ans = extract_boxed_answer(correct)
+
+            # Extract boxed answers and store them in trace_info
+            generated_ans = extract_boxed_answer(generated_ans)
+            correct_ans = extract_boxed_answer(correct_ans)
+            
+            trace_info["generated_answer"]["boxed"] = generated_ans
+            trace_info["correct_answer"]["boxed"] = correct_ans
 
             logger.info(f"After boxed extraction:")
             logger.info(f"Generated: {generated_ans}")
@@ -599,15 +658,117 @@ class SCoReTrainer:
 
             if generated_ans is None:
                 logger.info("No boxed answer found in generated answer")
+                # self._save_trace(trace_info)
                 return 0.0
 
-            # Clean the answers
-            for char in [' ', '$', '\\n', '\\', '{', '}']:
-                generated_ans = generated_ans.replace(char, '')
-                correct_ans = correct_ans.replace(char, '')
-            
-            generated_ans = generated_ans.lower().strip()
-            correct_ans = correct_ans.lower().strip()
+            def clean_math_expression(expr: str) -> str:
+                """
+                Clean and normalize mathematical expressions for comparison.
+                
+                Args:
+                    expr (str): Input mathematical expression, potentially in LaTeX format
+                    
+                Returns:
+                    str: Cleaned and normalized expression
+                """
+                if not expr:
+                    return ""
+                
+                try:
+                    # First try direct numeric conversion
+                    return str(float(expr))
+                except ValueError:
+                    pass
+                
+                # Remove any text formatting and whitespace
+                expr = re.sub(r'\\text{([^}]*)}', r'\1', expr)
+                expr = re.sub(r'\s+', '', expr)
+                
+                # LaTeX math commands to Python conversion
+                latex_to_python = {
+                    # Basic operations
+                    '\\cdot': '*',
+                    '\\times': '*',
+                    '\\div': '/',
+                    
+                    # Comparisons
+                    '\\le': '<=',
+                    '\\ge': '>=',
+                    '\\lt': '<',
+                    '\\gt': '>',
+                    '\\neq': '!=',
+                    
+                    # Special values
+                    '\\infty': 'float("inf")',
+                    '\\pi': 'pi',
+                    
+                    # Signs
+                    '\\pm': '+',  # Simplified to positive case
+                    '\\mp': '-',  # Simplified to negative case
+                }
+                
+                # Replace LaTeX commands with Python equivalents
+                for latex, python in latex_to_python.items():
+                    expr = expr.replace(latex, python)
+                
+                # Handle all types of fractions (\frac, \dfrac, \tfrac)
+                # Keep processing until no more fraction commands are found
+                fraction_pattern = r'\\[dt]?frac\{([^{}]+)\}\{([^{}]+)\}'
+                while re.search(fraction_pattern, expr):
+                    # Find the innermost fraction (no fraction commands in numerator/denominator)
+                    match = re.search(fraction_pattern, expr)
+                    if not match:
+                        break
+                        
+                    # Extract numerator and denominator
+                    num, den = match.group(1), match.group(2)
+                    
+                    # Handle nested parentheses in numerator/denominator
+                    if re.search(r'[+\-*/]', num):
+                        num = f"({num})"
+                    if re.search(r'[+\-*/]', den):
+                        den = f"({den})"
+                        
+                    # Replace the fraction with division
+                    start, end = match.span()
+                    expr = expr[:start] + f"{num}/{den}" + expr[end:]
+                
+                # Handle square roots
+                expr = re.sub(r'\\sqrt\{([^{}]+)\}', r'sqrt(\1)', expr)
+                
+                # Handle nth roots
+                expr = re.sub(r'\\sqrt\[(\d+)\]\{([^{}]+)\}', r'((\2)**(1/\1))', expr)
+                
+                # Handle exponents with various formats
+                exponent_patterns = [
+                    (r'(\d+)\^{([^{}]+)}', r'\1**(\2)'),  # 2^{x}
+                    (r'(\w+)\^{([^{}]+)}', r'\1**(\2)'),  # x^{2}
+                    (r'(\d+)\^(\d+)', r'\1**\2'),         # 2^2
+                    (r'(\w+)\^(\d+)', r'\1**\2'),         # x^2
+                ]
+                for pattern, replacement in exponent_patterns:
+                    expr = re.sub(pattern, replacement, expr)
+                
+                # Clean up remaining LaTeX artifacts
+                expr = re.sub(r'\\[a-zA-Z]+', '', expr)  # Remove any remaining LaTeX commands
+                expr = expr.replace('\\', '')            # Remove backslashes
+                expr = expr.replace('{', '').replace('}', '')  # Remove curly braces
+                
+                # Handle boxed answers
+                boxed_match = re.search(r'\\boxed{([^{}]+)}', expr)
+                if boxed_match:
+                    expr = boxed_match.group(1)
+                
+                # Final numeric conversion attempt
+                try:
+                    # Try to evaluate simple numeric expressions
+                    if re.match(r'^[\d\+\-\*\/\(\)\.\s]*$', expr):
+                        return str(float(eval(expr)))
+                    return expr.strip()
+                except (SyntaxError, NameError, ZeroDivisionError):
+                    return expr.strip()
+            generated_ans = clean_math_expression(generated_ans)
+            correct_ans = clean_math_expression(correct_ans)
 
             logger.info(f"After cleaning:")
             logger.info(f"Generated: {generated_ans}")
@@ -679,11 +840,15 @@ class SCoReTrainer:
 
                 ####################################################################### 
                 logger.info(f"Expression comparison reward: {reward}")
+                trace_info["reward_computation"]["final_reward"] = reward
             except (SympifyError, TypeError, ValueError) as e:
                 logger.info(f"Expression parsing failed: {str(e)}")
                 logger.info("Falling back to string comparison")
                 trace_info["reward_computation"]["method_used"] = "string_comparison"
                 trace_info["reward_computation"]["error"] = str(e)
+                trace_info["generated_answer"]["parsed_expr"] = str(gen_expr)
+                trace_info["correct_answer"]["parsed_expr"] = str(cor_expr)
+                
                 reward = 1.0 if generated_ans == correct_ans else 0.0
                 logger.info(f"String comparison reward: {reward}")
 
@@ -1061,9 +1226,9 @@ class SCoReTrainer:
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
                             logger.info(f"\n=== Sample {idx + 1} First Attempt ===")
-                            logger.info(f"Input:\n{inp}")
-                            logger.info(f"Model Response:\n{resp}")
-                            logger.info(f"Correct Answer:\n{corr}")
+                            # logger.info(f"Input:\n{inp}")
+                            # logger.info(f"Model Response:\n{resp}")
+                            # logger.info(f"Correct Answer:\n{corr}")
                     
                     # Second attempt with self-correction instruction
                     second_inputs, correct, tests = self.prepare_batch(
@@ -1087,7 +1252,7 @@ class SCoReTrainer:
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (prompt, resp) in enumerate(zip(second_inputs, second_responses)):
                             logger.info(f"\n=== Sample {idx + 1} Second Attempt ===")
-                            logger.info(f"Prompt:\n{prompt}")
+                            #logger.info(f"Prompt:\n{prompt}")
                             logger.info(f"Model Response:\n{resp}")
 
                     # Compute reward bonus for making progress
@@ -1428,7 +1593,7 @@ def main():
     # Start training and evaluation
     try:
         trainer.train()
-        trainer.evaluate()
+        # trainer.evaluate()
     except Exception as e:
         logger.critical(f"Error during training/evaluation: {e}")
         return
