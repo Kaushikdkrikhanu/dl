@@ -46,6 +46,7 @@ except LookupError:
 
 
 # Configure logging
+log_file_path = os.path.join(os.getcwd(), "application.log")  # Specify the log file name
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
@@ -53,6 +54,15 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# Add a file handler
+file_handler = logging.FileHandler(log_file_path)
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+logger.info("Logger is configured to write to a file.")
 
 
 def set_seed(seed: int) -> None:
@@ -88,8 +98,8 @@ class Config:
     batch_size: int = 1
     max_seq_len: int = 2048
     max_new_tokens: int = 2048
-    num_epochs_stage_one: int = 25
-    num_epochs_stage_two: int = 25
+    num_epochs_stage_one: int = 1
+    num_epochs_stage_two: int = 1
 
     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device: torch.device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -567,7 +577,7 @@ class SCoReTrainer:
             logger.error(f"Error computing KL divergence: {e}")
             raise RuntimeError("KL divergence computation failed.") from e
 
-    def reward_function_math(self, generated: str, correct: str) -> Tuple[float]:
+    def reward_function_math(self, generated: str, correct: str,  return_traces: False) -> Tuple[float]:
         """
         Compute rewards for math tasks.
         """
@@ -904,6 +914,9 @@ class SCoReTrainer:
         logger.info(f"Reward: {reward}")
         logger.info("===========================\n")   
         self._save_trace(trace_info)
+
+        if return_traces: 
+            return trace_info
         return reward
 
     def _save_trace(self, trace_info: Dict) -> None:
@@ -1000,7 +1013,7 @@ class SCoReTrainer:
         for i, gen in enumerate(generated):
             try:
                 if self.config.task == 'MATH':
-                    r = self.reward_function_math(gen, correct[i])
+                    r = self.reward_function_math(gen, correct[i], False)
                     rewards.append(r)
 
             except Exception as e:
@@ -1074,6 +1087,8 @@ class SCoReTrainer:
             for epoch in range(self.config.num_epochs_stage_one):
                 logger.info(f"Starting Stage I Training - Epoch {epoch + 1}")
                 self.stage_one()
+                logger.info("EVALUATING AFTER STAGE ONE")
+                self.evaluate()
             for epoch in range(self.config.num_epochs_stage_two):
                 logger.info(f"Starting Stage II Training - Epoch {epoch + 1}")
                 self.stage_two()
@@ -1139,7 +1154,8 @@ class SCoReTrainer:
         self.model.train()
         total_loss = 0.0
 
-        
+        log_file_name = f"stage_one_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        log_data = []  # This will store all the log entries
 
         for batch in tqdm(self.train_loader, desc="Stage I Training"):
             self.global_step += 1
@@ -1168,6 +1184,7 @@ class SCoReTrainer:
                     first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=0.7)
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     
+                    first_trace = self.reward_function_math(first_responses[0], correct[0], True)
                     # maybe this is needed too in stage_two?
                     first_responses = [first_response.split("assistant\n\n", 1)[-1] for first_response in first_responses]
                     # Print first attempt details
@@ -1196,6 +1213,7 @@ class SCoReTrainer:
                     
                     second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len)
                     second_responses = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
+                    second_trace = self.reward_function_math(second_responses[0], correct[0], True)
                     
                     # Print second attempt details
                     if self.global_step % self.config.logging_steps == 0:
@@ -1213,6 +1231,22 @@ class SCoReTrainer:
                     
                     # Total loss is negative reward for second attempt plus KL penalty on first attempt
                     loss = -rewards.mean() + kl_loss
+
+                    log_data.append({
+                        "first_prompt": inputs[0],
+                        "second_prompt": second_inputs[0],
+                        "solution": correct[0],
+                        "first_response": first_responses[0],
+                        "second_response": second_responses[0],
+                        "first_trace": first_trace,
+                        "second_trace": second_trace
+                    
+                    })
+
+                    with open(log_file_name, 'a') as f:
+                        json.dump(log_data, f, indent=4)
+                    log_data = []                
+                    print('stage_one logged')
 
             except Exception as e:
                 logger.error(f"Error during Stage I forward pass: {e}")
@@ -1266,6 +1300,9 @@ class SCoReTrainer:
         self.model.train()
         total_loss = 0.0
 
+        log_file_name = f"stage_two_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        log_data = []  # This will store all the log entries
+
         for batch in tqdm(self.train_loader, desc="Stage II Training"):
             self.global_step += 1
             try:
@@ -1282,10 +1319,16 @@ class SCoReTrainer:
                 
                 with torch.cuda.amp.autocast(enabled=self.config.mixed_precision and torch.cuda.is_available()):
                     # Generate first attempt
+                    first_logits = self.model(first_encodings['input_ids'], first_encodings['attention_mask'])
+                    
+                    with torch.no_grad():
+                        first_ref_logits = self.ref_model(first_encodings['input_ids'], first_encodings['attention_mask'])
+                    
+                    first_kl_loss = self.compute_kl_divergence(first_logits, first_ref_logits) 
                     first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=0.7)
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     first_rewards = self.compute_rewards(first_responses, correct, tests)['rewards']
-                    
+                    first_trace = self.reward_function_math(first_responses[0], correct[0], True)
                     # Print first attempt details
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
@@ -1309,9 +1352,16 @@ class SCoReTrainer:
                         max_length=self.config.max_seq_len
                     ).to(self.config.device)
                     
+                    second_logits = self.model(second_encodings['input_ids'], second_encodings['attention_mask'])
+                    with torch.no_grad():
+                        # first_ref_logits = self.ref_model(first_encodings['input_ids'], first_encodings['attention_mask'])
+                        second_ref_logits = self.ref_model(second_encodings['input_ids'], second_encodings['attention_mask'])
+                    
+                    second_kl_loss = self.compute_kl_divergence(second_logits, second_ref_logits)
                     second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len)
                     second_responses = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
                     second_rewards = self.compute_rewards(second_responses, correct, tests)['rewards']
+                    second_trace = self.reward_function_math(second_responses[0], correct[0], True)
                     
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (prompt, resp) in enumerate(zip(second_inputs, second_responses)):
@@ -1326,17 +1376,27 @@ class SCoReTrainer:
                     total_rewards = first_rewards + second_rewards + progress_bonus
                     
                     # KL regularization for both attempts
-                    first_logits = self.model(first_encodings['input_ids'], first_encodings['attention_mask'])
-                    second_logits = self.model(second_encodings['input_ids'], second_encodings['attention_mask'])
-                    with torch.no_grad():
-                        first_ref_logits = self.ref_model(first_encodings['input_ids'], first_encodings['attention_mask'])
-                        second_ref_logits = self.ref_model(second_encodings['input_ids'], second_encodings['attention_mask'])
-                    
-                    kl_loss = (self.compute_kl_divergence(first_logits, first_ref_logits) + 
-                            self.compute_kl_divergence(second_logits, second_ref_logits)) * self.config.beta_1
+                        
+                    kl_loss = (first_kl_loss + second_kl_loss) * self.config.beta_1
                     
                     # Final loss
                     loss = -total_rewards.mean() + kl_loss
+
+                    log_data.append({
+                        "first_prompt": inputs[0],
+                        "second_prompt": second_inputs[0],
+                        "solution": correct[0],
+                        "first_response": first_responses[0],
+                        "second_response": second_responses[0],
+                        "first_trace": first_trace,
+                        "second_trace": second_trace
+                    
+                    })
+
+                    with open(log_file_name, 'a') as f:
+                        json.dump(log_data, f, indent=4)
+                    log_data = []                
+                    print('stage_two logged')
 
 
             except Exception as e:
@@ -1402,6 +1462,9 @@ class SCoReTrainer:
         total_correct_t1, total_correct_t2, total_samples = 0.0, 0.0, 0
         delta_i_to_c, delta_c_to_i = 0, 0
 
+        log_file_name = f"evaluate_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        log_data = []  # This will store all the log entries
+
         try:
             with torch.no_grad():
                 for batch in tqdm(self.val_loader, desc="Evaluation"):
@@ -1422,6 +1485,8 @@ class SCoReTrainer:
                         # Generate first attempt
                         first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.7)
                         first = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
+                        first_trace = self.reward_function_math(first[0], correct[0], True)
+                    
                         # Generate second attempt based on first
                         second_inputs, correct, tests = self.prepare_batch(
                             batch,
@@ -1437,14 +1502,30 @@ class SCoReTrainer:
                         ).to(self.config.device)
                         second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=0.7)
                         second = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
+                        second_trace = self.reward_function_math(second[0], correct[0], True)
+                    
+                        log_data.append({
+                        "first_prompt": inputs[0],
+                        "second_prompt": second_inputs[0],
+                        "solution": correct[0],
+                        "first_response": first[0],
+                        "second_response": second[0],
+                        "first_trace": first_trace,
+                        "second_trace": second_trace
+                    
+                        })
+
+                        with open(log_file_name, 'a') as f:
+                            json.dump(log_data, f, indent=4)
+                        log_data = []
                         # Compute rewards
-                        if self.global_step % self.config.logging_steps == 0:
-                            for idx, (inp, f_resp, s_resp, corr) in enumerate(zip(inputs, first, second, correct)):
-                                logger.info(f"\n=== Sample {idx + 1} ===")
-                                logger.info(f"Problem:\n{batch[idx]['problem']}")
-                                logger.info(f"First attempt:\n{f_resp}")
-                                logger.info(f"Second attempt:\n{s_resp}")
-                                logger.info(f"Correct answer:\n{corr}")
+                        # if self.global_step % self.config.logging_steps == 0:
+                        #     for idx, (inp, f_resp, s_resp, corr) in enumerate(zip(inputs, first, second, correct)):
+                        #         logger.info(f"\n=== Sample {idx + 1} ===")
+                        #         logger.info(f"Problem:\n{batch[idx]['problem']}")
+                        #         logger.info(f"First attempt:\n{f_resp}")
+                        #         logger.info(f"Second attempt:\n{s_resp}")
+                        #         logger.info(f"Correct answer:\n{corr}")
                         rewards_first = self.compute_rewards(first, correct, tests)['rewards']
                         rewards_second = self.compute_rewards(second, correct, tests)['rewards']
                     except Exception as e:
@@ -1565,7 +1646,7 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'selected_problems_105_Level1.json')
+        train_file = os.path.join(config.data_path, 'all_level_1_problems.json')
         val_file = os.path.join(config.data_path, 'math_test.json')
     else:
         logger.critical("Invalid task specified!")
@@ -1591,7 +1672,7 @@ def main():
             num_workers=config.num_workers
         )
         val_loader = DataLoader(
-            val_dataset,
+            train_dataset,
             batch_size=config.batch_size,
             shuffle=False,
             num_workers=config.num_workers
@@ -1656,7 +1737,10 @@ def main():
 
     # Start training and evaluation
     try:
+        logger.info("INITIAL EVALUATION")
+        trainer.evaluate()
         trainer.train()
+        logger.info("EVALUATING AFTER STAGE TWO: FINAL")
         trainer.evaluate()
     except Exception as e:
         logger.critical(f"Error during training/evaluation: {e}")
