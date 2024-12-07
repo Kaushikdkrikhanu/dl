@@ -1737,8 +1737,8 @@ def main():
 
     # Start training and evaluation
     try:
-        logger.info("INITIAL EVALUATION")
-        trainer.evaluate()
+        # logger.info("INITIAL EVALUATION")
+        # trainer.evaluate()
         trainer.train()
         logger.info("EVALUATING AFTER STAGE TWO: FINAL")
         trainer.evaluate()
