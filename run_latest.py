@@ -162,18 +162,18 @@ def get_math_correction_prompt(problem: str, prev_attempt: str) -> str:
     """Generate the self-correction prompt for math problems."""
     return (
         "<|begin_of_text|>"
-        # "<|start_header_id|>system"
-        # "<|end_header_id|>\n"
-        # "You are a math expert. When you respond, respond only with the Solution of the final Problem, "
-        # "thinking step by step. At the end of the Solution, when you give your final answer, "
-        # "write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
-        # "<|eot_id|>"
-        # "<|start_header_id|>user"
-        # "<|end_header_id|>\n"
-        # f"{problem}"
-        # "<|eot_id|>"
-        # "<|start_header_id|>assistant"
-        # "<|end_header_id|>\n"
+        "<|start_header_id|>system"
+        "<|end_header_id|>\n"
+        "You are a math expert. When you respond, respond only with the Solution of the final Problem, "
+        "thinking step by step. At the end of the Solution, when you give your final answer, "
+        "write it in the form 'Final Answer: The final answer is \\boxed{answer}. I hope it is correct.'"
+        "<|eot_id|>"
+        "<|start_header_id|>user"
+        "<|end_header_id|>\n"
+        f"{problem}"
+        "<|eot_id|>"
+        "<|start_header_id|>assistant"
+        "<|end_header_id|>\n"
         f"{prev_attempt}"
         "<|eot_id|>"
         "<|start_header_id|>user"
@@ -1184,7 +1184,7 @@ class SCoReTrainer:
                     
                     first_trace = self.reward_function_math(first_responses[0], correct[0], True)
                     # maybe this is needed too in stage_two?
-                    first_responses = [first_response.split("assistant\n\n", 1)[-1] for first_response in first_responses]
+                    first_responses = [first_response.split("assistant", 1)[-1] for first_response in first_responses]
                     # Print first attempt details
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
@@ -1327,6 +1327,7 @@ class SCoReTrainer:
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     first_rewards = self.compute_rewards(first_responses, correct, tests)['rewards']
                     first_trace = self.reward_function_math(first_responses[0], correct[0], True)
+                    first_responses = [first_response.split("assistant", 1)[-1] for first_response in first_responses]
                     # Print first attempt details
                     if self.global_step % self.config.logging_steps == 0:
                         for idx, (inp, resp, corr) in enumerate(zip(inputs, first_responses, correct)):
@@ -1736,7 +1737,7 @@ def main():
     # Start training and evaluation
     try:
         logger.info("INITIAL EVALUATION")
-        trainer.evaluate()
+        # trainer.evaluate()
         trainer.train()
         logger.info("EVALUATING AFTER STAGE TWO: FINAL")
         trainer.evaluate()
