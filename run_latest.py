@@ -46,7 +46,7 @@ except LookupError:
 
 
 # Configure logging
-log_file_path = os.path.join(os.getcwd(), "application.log")  # Specify the log file name
+log_file_path = os.path.join(os.getcwd(), f"application_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")  # Specify the log file name
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
@@ -329,12 +329,13 @@ class AdvancedModel(nn.Module):
 
         try:
             lora_config = LoraConfig(
-                r=32,  # Rank of the low-rank matrices
-                lora_alpha=32,  # Scaling factor
-                target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],  # Modules to apply LoRA (e.g., attention layers)
-                lora_dropout=0.1,  # Dropout for LoRA layers
-                bias="none",  # Bias handling ("none", "all", or "lora_only")
-                task_type="CAUSAL_LM"  # Task type (CAUSAL_LM, SEQ2SEQ_LM, etc.)
+                r=16,
+                lora_alpha=16,
+                target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                      "gate_proj", "up_proj", "down_proj",],
+                lora_dropout=0.1,
+                bias="none",
+                task_type="CAUSAL_LM"
             )
             # bnb_config = BitsAndBytesConfig(
             #     load_in_4bit=True,  # Enable 4-bit quantization
@@ -1085,8 +1086,8 @@ class SCoReTrainer:
             for epoch in range(self.config.num_epochs_stage_one):
                 logger.info(f"Starting Stage I Training - Epoch {epoch + 1}")
                 self.stage_one()
-                logger.info("EVALUATING AFTER STAGE ONE")
-                self.evaluate()
+                # logger.info("EVALUATING AFTER STAGE ONE")
+                # self.evaluate()
             for epoch in range(self.config.num_epochs_stage_two):
                 logger.info(f"Starting Stage II Training - Epoch {epoch + 1}")
                 self.stage_two()
@@ -1645,8 +1646,8 @@ def main():
 
     # Determine data files based on task
     if config.task == 'MATH':
-        train_file = os.path.join(config.data_path, 'all_level_1_problems.json')
-        val_file = os.path.join(config.data_path, 'math_test.json')
+        train_file = os.path.join(config.data_path, 'train_problems_level1.json')
+        val_file = os.path.join(config.data_path, 'test_problems_level1.json')
     else:
         logger.critical("Invalid task specified!")
         return
@@ -1671,7 +1672,7 @@ def main():
             num_workers=config.num_workers
         )
         val_loader = DataLoader(
-            train_dataset,
+            val_dataset,
             batch_size=config.batch_size,
             shuffle=False,
             num_workers=config.num_workers
@@ -1737,7 +1738,7 @@ def main():
     # Start training and evaluation
     try:
         logger.info("INITIAL EVALUATION")
-        # trainer.evaluate()
+        trainer.evaluate()
         trainer.train()
         logger.info("EVALUATING AFTER STAGE TWO: FINAL")
         trainer.evaluate()

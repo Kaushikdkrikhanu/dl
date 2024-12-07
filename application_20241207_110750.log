@@ -1,0 +1,33 @@
+2024-12-07 11:07:50,869 [INFO] __main__: Logger is configured to write to a file.
+2024-12-07 11:07:51,163 [INFO] __main__: Seed set to 42.
+2024-12-07 11:07:51,164 [INFO] __main__: Loaded 464 samples from ./data/train_problems_level1.json.
+2024-12-07 11:07:51,164 [INFO] __main__: Loaded 100 samples from ./data/test_problems_level1.json.
+2024-12-07 11:07:51,165 [INFO] __main__: Datasets loaded successfully.
+2024-12-07 11:07:51,550 [INFO] __main__: Tokenizer loaded for meta-llama/Llama-3.2-1B-Instruct.
+2024-12-07 11:07:51,551 [INFO] __main__: Using EOS token as PAD token.
+2024-12-07 11:07:54,231 [INFO] __main__: Tokenizer loaded for meta-llama/Llama-3.2-1B-Instruct.
+2024-12-07 11:07:54,231 [INFO] __main__: Using EOS token as PAD token.
+2024-12-07 11:07:56,458 [INFO] __main__: Models initialized successfully.
+2024-12-07 11:07:57,505 [INFO] __main__: Optimizer and scheduler set up successfully.
+2024-12-07 11:07:58,394 [INFO] __main__: Weights & Biases initialized successfully.
+2024-12-07 11:07:58,394 [INFO] __main__: Trainer initialized successfully.
+2024-12-07 11:07:58,394 [INFO] __main__: INITIAL EVALUATION
+2024-12-07 11:07:58,394 [INFO] __main__: Starting training process.
+2024-12-07 11:07:58,394 [INFO] __main__: Starting Stage I Training - Epoch 1
+2024-12-07 11:08:17,841 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-07 11:08:17,842 [INFO] __main__: After boxed extraction:
+2024-12-07 11:08:17,842 [INFO] __main__: Generated: \tan^2 20^\circ
+2024-12-07 11:08:17,842 [INFO] __main__: Correct: 1
+2024-12-07 11:08:17,845 [WARNING] __main__: Failed to parse expression '(tan)**(220)^': invalid syntax (<string>, line 1)
+2024-12-07 11:08:17,846 [INFO] __main__: After cleaning:
+2024-12-07 11:08:17,846 [INFO] __main__: Generated: (tan)**(220)^
+2024-12-07 11:08:17,846 [INFO] __main__: Correct: 1
+2024-12-07 11:08:17,846 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-07 11:08:17,847 [ERROR] __main__: Error in reward computation: invalid syntax (<string>, line 1)
+2024-12-07 11:08:17,847 [INFO] __main__: === Final Reward Metrics ===
+2024-12-07 11:08:17,847 [INFO] __main__: Reward: 0.0
+2024-12-07 11:08:17,847 [INFO] __main__: ===========================
+
+2024-12-07 11:08:17,848 [INFO] __main__: 
+=== Sample 1 First Attempt ===

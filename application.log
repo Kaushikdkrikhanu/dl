@@ -3626,3 +3626,262 @@ Rewards: [0.0]
 2024-12-05 10:14:04,084 [INFO] __main__: Reward: 0.0
 2024-12-05 10:14:04,084 [INFO] __main__: ===========================
 
+2024-12-05 10:14:08,532 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:14:08,532 [INFO] __main__: After boxed extraction:
+2024-12-05 10:14:08,532 [INFO] __main__: Generated: 7
+2024-12-05 10:14:08,532 [INFO] __main__: Correct: 140
+2024-12-05 10:14:08,533 [INFO] __main__: After cleaning:
+2024-12-05 10:14:08,533 [INFO] __main__: Generated: 7
+2024-12-05 10:14:08,533 [INFO] __main__: Correct: 140
+2024-12-05 10:14:08,533 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:14:08,534 [INFO] __main__: Parsed generated: 7
+2024-12-05 10:14:08,534 [INFO] __main__: Parsed correct: 140
+2024-12-05 10:14:08,534 [INFO] __main__: Simplified difference: -133
+2024-12-05 10:14:08,535 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:14:08,535 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:14:08,535 [INFO] __main__: Reward: 0.0
+2024-12-05 10:14:08,535 [INFO] __main__: ===========================
+
+2024-12-05 10:14:52,392 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:14:52,392 [INFO] __main__: After boxed extraction:
+2024-12-05 10:14:52,393 [INFO] __main__: Generated: None
+2024-12-05 10:14:52,393 [INFO] __main__: Correct: 140
+2024-12-05 10:14:52,393 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:14:52,393 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:14:52,394 [INFO] __main__: After boxed extraction:
+2024-12-05 10:14:52,394 [INFO] __main__: Generated: 7
+2024-12-05 10:14:52,394 [INFO] __main__: Correct: 140
+2024-12-05 10:14:52,394 [INFO] __main__: After cleaning:
+2024-12-05 10:14:52,394 [INFO] __main__: Generated: 7
+2024-12-05 10:14:52,394 [INFO] __main__: Correct: 140
+2024-12-05 10:14:52,394 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:14:52,395 [INFO] __main__: Parsed generated: 7
+2024-12-05 10:14:52,395 [INFO] __main__: Parsed correct: 140
+2024-12-05 10:14:52,396 [INFO] __main__: Simplified difference: -133
+2024-12-05 10:14:52,396 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:14:52,396 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:14:52,396 [INFO] __main__: Reward: 0.0
+2024-12-05 10:14:52,396 [INFO] __main__: ===========================
+
+2024-12-05 10:14:52,397 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:14:52,397 [INFO] __main__: After boxed extraction:
+2024-12-05 10:14:52,397 [INFO] __main__: Generated: None
+2024-12-05 10:14:52,397 [INFO] __main__: Correct: 140
+2024-12-05 10:14:52,397 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:14:57,635 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:14:57,635 [INFO] __main__: After boxed extraction:
+2024-12-05 10:14:57,636 [INFO] __main__: Generated: None
+2024-12-05 10:14:57,636 [INFO] __main__: Correct: \frac{1}{4}
+2024-12-05 10:14:57,636 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:04,604 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:04,604 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:04,605 [INFO] __main__: Generated: \frac{31}{32}
+2024-12-05 10:15:04,605 [INFO] __main__: Correct: \frac{1}{4}
+2024-12-05 10:15:04,607 [INFO] __main__: After cleaning:
+2024-12-05 10:15:04,607 [INFO] __main__: Generated: 0.96875
+2024-12-05 10:15:04,607 [INFO] __main__: Correct: 0.25
+2024-12-05 10:15:04,607 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:04,608 [INFO] __main__: Parsed generated: 0.968750000000000
+2024-12-05 10:15:04,608 [INFO] __main__: Parsed correct: 0.250000000000000
+2024-12-05 10:15:04,608 [INFO] __main__: Simplified difference: 0.718750000000000
+2024-12-05 10:15:04,608 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:04,608 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:04,608 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:04,609 [INFO] __main__: ===========================
+
+2024-12-05 10:15:04,609 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:04,609 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:04,609 [INFO] __main__: Generated: None
+2024-12-05 10:15:04,609 [INFO] __main__: Correct: \frac{1}{4}
+2024-12-05 10:15:04,609 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:04,610 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:04,610 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:04,610 [INFO] __main__: Generated: \frac{31}{32}
+2024-12-05 10:15:04,610 [INFO] __main__: Correct: \frac{1}{4}
+2024-12-05 10:15:04,611 [INFO] __main__: After cleaning:
+2024-12-05 10:15:04,611 [INFO] __main__: Generated: 0.96875
+2024-12-05 10:15:04,611 [INFO] __main__: Correct: 0.25
+2024-12-05 10:15:04,611 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:04,612 [INFO] __main__: Parsed generated: 0.968750000000000
+2024-12-05 10:15:04,612 [INFO] __main__: Parsed correct: 0.250000000000000
+2024-12-05 10:15:04,612 [INFO] __main__: Simplified difference: 0.718750000000000
+2024-12-05 10:15:04,612 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:04,612 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:04,612 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:04,613 [INFO] __main__: ===========================
+
+2024-12-05 10:15:07,458 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:07,459 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:07,459 [INFO] __main__: Generated: \frac{37}{4}
+2024-12-05 10:15:07,459 [INFO] __main__: Correct: 38
+2024-12-05 10:15:07,460 [INFO] __main__: After cleaning:
+2024-12-05 10:15:07,460 [INFO] __main__: Generated: 9.25
+2024-12-05 10:15:07,460 [INFO] __main__: Correct: 38
+2024-12-05 10:15:07,460 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:07,461 [INFO] __main__: Parsed generated: 9.25000000000000
+2024-12-05 10:15:07,461 [INFO] __main__: Parsed correct: 38
+2024-12-05 10:15:07,461 [INFO] __main__: Simplified difference: -28.7500000000000
+2024-12-05 10:15:07,462 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:07,462 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:07,462 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:07,462 [INFO] __main__: ===========================
+
+2024-12-05 10:15:15,024 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:15,024 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:15,024 [INFO] __main__: Generated: None
+2024-12-05 10:15:15,024 [INFO] __main__: Correct: 38
+2024-12-05 10:15:15,025 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:15,025 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:15,025 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:15,025 [INFO] __main__: Generated: \frac{37}{4}
+2024-12-05 10:15:15,025 [INFO] __main__: Correct: 38
+2024-12-05 10:15:15,026 [INFO] __main__: After cleaning:
+2024-12-05 10:15:15,026 [INFO] __main__: Generated: 9.25
+2024-12-05 10:15:15,026 [INFO] __main__: Correct: 38
+2024-12-05 10:15:15,026 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:15,027 [INFO] __main__: Parsed generated: 9.25000000000000
+2024-12-05 10:15:15,027 [INFO] __main__: Parsed correct: 38
+2024-12-05 10:15:15,027 [INFO] __main__: Simplified difference: -28.7500000000000
+2024-12-05 10:15:15,028 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:15,028 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:15,028 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:15,028 [INFO] __main__: ===========================
+
+2024-12-05 10:15:15,028 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:15,028 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:15,028 [INFO] __main__: Generated: None
+2024-12-05 10:15:15,028 [INFO] __main__: Correct: 38
+2024-12-05 10:15:15,029 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:18,361 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:18,361 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:18,361 [INFO] __main__: Generated: \text{5040}
+2024-12-05 10:15:18,362 [INFO] __main__: Correct: 252
+2024-12-05 10:15:18,362 [INFO] __main__: After cleaning:
+2024-12-05 10:15:18,363 [INFO] __main__: Generated: 5040
+2024-12-05 10:15:18,363 [INFO] __main__: Correct: 252
+2024-12-05 10:15:18,363 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:18,363 [INFO] __main__: Parsed generated: 5040
+2024-12-05 10:15:18,364 [INFO] __main__: Parsed correct: 252
+2024-12-05 10:15:18,364 [INFO] __main__: Simplified difference: 4788
+2024-12-05 10:15:18,364 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:18,364 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:18,364 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:18,365 [INFO] __main__: ===========================
+
+2024-12-05 10:15:23,753 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:23,753 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:23,753 [INFO] __main__: Generated: None
+2024-12-05 10:15:23,753 [INFO] __main__: Correct: 252
+2024-12-05 10:15:23,753 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:23,754 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:23,754 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:23,754 [INFO] __main__: Generated: \text{5040}
+2024-12-05 10:15:23,754 [INFO] __main__: Correct: 252
+2024-12-05 10:15:23,755 [INFO] __main__: After cleaning:
+2024-12-05 10:15:23,755 [INFO] __main__: Generated: 5040
+2024-12-05 10:15:23,755 [INFO] __main__: Correct: 252
+2024-12-05 10:15:23,755 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:23,756 [INFO] __main__: Parsed generated: 5040
+2024-12-05 10:15:23,756 [INFO] __main__: Parsed correct: 252
+2024-12-05 10:15:23,756 [INFO] __main__: Simplified difference: 4788
+2024-12-05 10:15:23,757 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:23,757 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:23,757 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:23,757 [INFO] __main__: ===========================
+
+2024-12-05 10:15:23,757 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:23,757 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:23,757 [INFO] __main__: Generated: None
+2024-12-05 10:15:23,758 [INFO] __main__: Correct: 252
+2024-12-05 10:15:23,758 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:31,287 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:31,287 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:31,287 [INFO] __main__: Generated: 2007
+2024-12-05 10:15:31,287 [INFO] __main__: Correct: 364
+2024-12-05 10:15:31,288 [INFO] __main__: After cleaning:
+2024-12-05 10:15:31,288 [INFO] __main__: Generated: 2007
+2024-12-05 10:15:31,288 [INFO] __main__: Correct: 364
+2024-12-05 10:15:31,288 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:31,289 [INFO] __main__: Parsed generated: 2007
+2024-12-05 10:15:31,289 [INFO] __main__: Parsed correct: 364
+2024-12-05 10:15:31,289 [INFO] __main__: Simplified difference: 1643
+2024-12-05 10:15:31,290 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:31,290 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:31,290 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:31,290 [INFO] __main__: ===========================
+
+2024-12-05 10:15:34,544 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:34,545 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:34,545 [INFO] __main__: Generated: None
+2024-12-05 10:15:34,545 [INFO] __main__: Correct: 364
+2024-12-05 10:15:34,545 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:15:34,545 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:34,545 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:34,546 [INFO] __main__: Generated: 2007
+2024-12-05 10:15:34,546 [INFO] __main__: Correct: 364
+2024-12-05 10:15:34,546 [INFO] __main__: After cleaning:
+2024-12-05 10:15:34,546 [INFO] __main__: Generated: 2007
+2024-12-05 10:15:34,546 [INFO] __main__: Correct: 364
+2024-12-05 10:15:34,546 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:15:34,547 [INFO] __main__: Parsed generated: 2007
+2024-12-05 10:15:34,547 [INFO] __main__: Parsed correct: 364
+2024-12-05 10:15:34,547 [INFO] __main__: Simplified difference: 1643
+2024-12-05 10:15:34,547 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:15:34,547 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:15:34,548 [INFO] __main__: Reward: 0.0
+2024-12-05 10:15:34,548 [INFO] __main__: ===========================
+
+2024-12-05 10:15:34,548 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:15:34,548 [INFO] __main__: After boxed extraction:
+2024-12-05 10:15:34,548 [INFO] __main__: Generated: None
+2024-12-05 10:15:34,548 [INFO] __main__: Correct: 364
+2024-12-05 10:15:34,548 [INFO] __main__: No boxed answer found in generated answer
+2024-12-05 10:16:00,594 [INFO] __main__: 
+=== Math Reward Computation ===
+2024-12-05 10:16:00,595 [INFO] __main__: After boxed extraction:
+2024-12-05 10:16:00,595 [INFO] __main__: Generated: -18
+2024-12-05 10:16:00,595 [INFO] __main__: Correct: 756
+2024-12-05 10:16:00,595 [INFO] __main__: After cleaning:
+2024-12-05 10:16:00,595 [INFO] __main__: Generated: -18
+2024-12-05 10:16:00,596 [INFO] __main__: Correct: 756
+2024-12-05 10:16:00,596 [INFO] __main__: Attempting to parse mathematical expressions...
+2024-12-05 10:16:00,597 [INFO] __main__: Parsed generated: -18
+2024-12-05 10:16:00,597 [INFO] __main__: Parsed correct: 756
+2024-12-05 10:16:00,597 [INFO] __main__: Simplified difference: -774
+2024-12-05 10:16:00,597 [INFO] __main__: Expression comparison reward: 0.0
+2024-12-05 10:16:00,597 [INFO] __main__: === Final Reward Metrics ===
+2024-12-05 10:16:00,598 [INFO] __main__: Reward: 0.0
+2024-12-05 10:16:00,598 [INFO] __main__: ===========================
+
+2024-12-07 11:00:59,183 [INFO] __main__: Logger is configured to write to a file.
+2024-12-07 11:00:59,551 [INFO] __main__: Seed set to 42.
+2024-12-07 11:00:59,551 [CRITICAL] __main__: Data file ./data/train_problems_level1.json does not exist.
+2024-12-07 11:02:03,636 [INFO] __main__: Logger is configured to write to a file.
+2024-12-07 11:02:03,913 [INFO] __main__: Seed set to 42.
+2024-12-07 11:02:03,915 [INFO] __main__: Loaded 464 samples from ./data/train_problems_level1.json.
+2024-12-07 11:02:03,915 [INFO] __main__: Loaded 100 samples from ./data/test_problems_level1.json.
+2024-12-07 11:02:03,915 [INFO] __main__: Datasets loaded successfully.
+2024-12-07 11:02:04,345 [INFO] __main__: Tokenizer loaded for meta-llama/Llama-3.2-1B-Instruct.
+2024-12-07 11:02:04,345 [INFO] __main__: Using EOS token as PAD token.
+2024-12-07 11:02:23,397 [INFO] __main__: Tokenizer loaded for meta-llama/Llama-3.2-1B-Instruct.
+2024-12-07 11:02:23,397 [INFO] __main__: Using EOS token as PAD token.
