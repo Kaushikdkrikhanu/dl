@@ -1096,6 +1096,46 @@ class SCoReTrainer:
             logger.error(f"Error during training: {e}")
             raise
     
+    def save_checkpoint(self, epoch: int, stage: int, is_best: bool = False) -> None:
+        """Save model checkpoint."""
+        try:
+            checkpoint = {
+                'epoch': epoch,
+                'stage': stage,
+                'model_state_dict': self.model.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'global_step': self.global_step,
+                'best_reward': self.best_reward
+            }
+            
+            # Save regular checkpoint
+            checkpoint_path = os.path.join(
+                self.config.output_dir, 
+                f'checkpoint_stage{stage}_epoch{epoch}.pt'
+            )
+            torch.save(checkpoint, checkpoint_path)
+            logger.info(f"Saved checkpoint to {checkpoint_path}")
+            
+            # Save best model if this is the best performance
+            if is_best:
+                best_path = os.path.join(self.config.output_dir, 'best_model.pt')
+                torch.save(checkpoint, best_path)
+                logger.info(f"Saved best model to {best_path}")
+                
+            # Remove old checkpoints if save_total_limit is reached
+            checkpoints = sorted(
+                [f for f in os.listdir(self.config.output_dir) if f.startswith('checkpoint')],
+                key=lambda x: int(x.split('epoch')[-1].split('.')[0])
+            )
+            if len(checkpoints) > self.config.save_total_limit:
+                for old_ckpt in checkpoints[:-self.config.save_total_limit]:
+                    os.remove(os.path.join(self.config.output_dir, old_ckpt))
+                    
+        except Exception as e:
+            logger.error(f"Error saving checkpoint: {e}")
+            raise
+
     def log_metrics(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
         """Log training metrics to wandb and console."""
         if not self.use_wandb:
@@ -1486,7 +1526,7 @@ class SCoReTrainer:
                         first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.7)
                         first = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                         first_trace = self.reward_function_math(first[0], correct[0], True)
-                    
+                        first = [first.split("assistant", 1)[-1] for first_response in first]
                         # Generate second attempt based on first
                         second_inputs, correct, tests = self.prepare_batch(
                             batch,
