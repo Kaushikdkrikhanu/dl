@@ -98,8 +98,8 @@ class Config:
     batch_size: int = 1
     max_seq_len: int = 2048
     max_new_tokens: int = 2048
-    num_epochs_stage_one: int = 1
-    num_epochs_stage_two: int = 1
+    num_epochs_stage_one: int = 10
+    num_epochs_stage_two: int = 10
 
     device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device: torch.device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
