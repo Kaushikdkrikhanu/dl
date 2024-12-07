@@ -5,7 +5,8 @@ import torch
 checkpoint = "meta-llama/Llama-3.2-1B-Instruct"
 
 # Set device to GPU (CUDA) if available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
 # Load the tokenizer and model with proper settings for device and dtype
 # tokenizer = AutoTokenizer.from_pretrained(checkpoint)
@@ -39,12 +40,13 @@ def run(system_prompt, user_prompt):
     pipe = pipeline(
         "text-generation",
         model= "meta-llama/Llama-3.2-1B-Instruct",
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.float32 if device.type == "mps" else torch.bfloat16,  
         device_map="auto",
+        pad_token_id=2, 
     )
     out = pipe(
         full_prompt,
-        max_new_tokens=8192,
+        max_new_tokens=2048,
     )
     text = out[0]["generated_text"][-1]['content']
     # print('what',text)
@@ -109,15 +111,19 @@ correct2 = 0
 
 
 def print_memory_stats():
-    allocated_memory = torch.cuda.memory_allocated() / (1024 ** 3)  # Convert to GB
-    reserved_memory = torch.cuda.memory_reserved() / (1024 ** 3)    # Convert to GB
-    free_memory = reserved_memory - allocated_memory
+    if torch.cuda.is_available():
+        allocated_memory = torch.cuda.memory_allocated() / (1024 ** 3)  # Convert to GB
+        reserved_memory = torch.cuda.memory_reserved() / (1024 ** 3)    # Convert to GB
+        free_memory = reserved_memory - allocated_memory
 
-    print(f"Allocated Memory: {allocated_memory:.2f} GB")
-    print(f"Reserved Memory: {reserved_memory:.2f} GB")
-    print(f"Free Memory: {free_memory:.2f} GB")
+        print(f"Allocated Memory: {allocated_memory:.2f} GB")
+        print(f"Reserved Memory: {reserved_memory:.2f} GB")
+        print(f"Free Memory: {free_memory:.2f} GB")
+    elif torch.backends.mps.is_available():
+        # MPS doesn't have the same memory management API as CUDA
+        print("Memory statistics not available for MPS device")
 # Function to save lists to a JSON file
-def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file):
+def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file, json_data):
     if os.path.exists(output_file):
         with open(output_file, 'r') as f:
             data = json.load(f)
@@ -131,8 +137,17 @@ def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file
     first_single = extract_answer(first_answer)
     second_single = extract_answer(second_answer)
     
-    # Create a new answer pair object with correctness flags
+    # Create a new answer pair object with all fields
     answer_pair = {
+        # Original problem data
+        "problem": json_data['problem'],
+        "solution": json_data['solution'],
+        "answer": json_data['answer'],
+        "subject": json_data['subject'],
+        "level": json_data['level'],
+        "unique_id": json_data['unique_id'],
+        
+        # Model responses and evaluation
         "oracle_answer": oracle_answer,
         "first_answer": first_answer,
         "second_answer": second_answer,
@@ -146,7 +161,6 @@ def save_answers_to_file(oracle_answer, first_answer, second_answer, output_file
     # Write the updated data back to the file
     with open(output_file, 'w') as f:
         json.dump(data, f, indent=4)
-
 # Iterate over all files in the directory
 directory_path = "test.jsonl"
 with open(directory_path, 'r') as f:
@@ -201,4 +215,4 @@ with open(directory_path, 'r') as f:
         second_answer = model_self_corrected_answer
 
         # Save the answers to the file after processing each JSON file
-        save_answers_to_file(oracle_answer, first_answer, second_answer, output_file)
+        save_answers_to_file(oracle_answer, first_answer, second_answer, output_file, json_data)
