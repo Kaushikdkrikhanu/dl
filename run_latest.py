@@ -525,6 +525,7 @@ class SCoReTrainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config
+        self.best_reward = float('-inf')
         self.kl_loss_fn = nn.KLDivLoss(reduction='batchmean')
         self.global_step = 0
         self.reward_history: List[float] = []
@@ -1214,7 +1215,7 @@ class SCoReTrainer:
                 ).to(self.config.device)
                 
                 # Get logits for first attempt
-                with torch.cuda.amp.autocast(enabled=self.config.mixed_precision and torch.cuda.is_available()):
+                with torch.amp.autocast('cuda', enabled=self.config.mixed_precision and torch.cuda.is_available()):
                     first_logits = self.model(first_encodings['input_ids'], first_encodings['attention_mask'])
                     with torch.no_grad():
                         ref_logits = self.ref_model(first_encodings['input_ids'], first_encodings['attention_mask'])
@@ -1359,7 +1360,7 @@ class SCoReTrainer:
                     max_length=self.config.max_seq_len
                 ).to(self.config.device)
                 
-                with torch.cuda.amp.autocast(enabled=self.config.mixed_precision and torch.cuda.is_available()):
+                with torch.amp.autocast('cuda', enabled=self.config.mixed_precision and torch.cuda.is_available()):
                     # Generate first attempt
                     first_logits = self.model(first_encodings['input_ids'], first_encodings['attention_mask'])
                     
@@ -1529,7 +1530,7 @@ class SCoReTrainer:
                         first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.7)
                         first = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                         first_trace = self.reward_function_math(first[0], correct[0], True)
-                        first = [first.split("assistant", 1)[-1] for first_response in first]
+                        first = [first.split("assistant", 1)[-1] for first in first]
                         # Generate second attempt based on first
                         second_inputs, correct, tests = self.prepare_batch(
                             batch,
