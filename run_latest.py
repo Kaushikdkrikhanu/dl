@@ -448,7 +448,7 @@ class AdvancedModel(nn.Module):
         self,
         inputs: Dict[str, torch.Tensor],
         max_length: int = 4096,
-        temperature: float = 0.7,
+        temperature: float = 0.0,
         num_return_sequences: int = 1,
         min_length: int = 20  # Minimum length of generated text
     ) -> torch.Tensor:
@@ -1224,7 +1224,7 @@ class SCoReTrainer:
                     kl_loss = self.compute_kl_divergence(first_logits, ref_logits) * self.config.beta_2
                     
                     # Generate first attempt response
-                    first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=0.7)
+                    first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=1.0)
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     
                     first_trace = self.reward_function_math(first_responses[0], correct[0], True)
@@ -1254,7 +1254,7 @@ class SCoReTrainer:
                         max_length=self.config.max_seq_len
                     ).to(self.config.device)
                     
-                    second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len)
+                    second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=1.0)
                     second_responses = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
                     second_trace = self.reward_function_math(second_responses[0], correct[0], True)
                     
@@ -1368,7 +1368,7 @@ class SCoReTrainer:
                         first_ref_logits = self.ref_model(first_encodings['input_ids'], first_encodings['attention_mask'])
                     
                     first_kl_loss = self.compute_kl_divergence(first_logits, first_ref_logits) 
-                    first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=0.7)
+                    first_ids = self.model.generate_text(first_encodings, max_length=self.config.max_seq_len, temperature=1.0)
                     first_responses = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                     first_rewards = self.compute_rewards(first_responses, correct, tests)['rewards']
                     first_trace = self.reward_function_math(first_responses[0], correct[0], True)
@@ -1402,7 +1402,7 @@ class SCoReTrainer:
                         second_ref_logits = self.ref_model(second_encodings['input_ids'], second_encodings['attention_mask'])
                     
                     second_kl_loss = self.compute_kl_divergence(second_logits, second_ref_logits)
-                    second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len)
+                    second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=1.0)
                     second_responses = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
                     second_rewards = self.compute_rewards(second_responses, correct, tests)['rewards']
                     second_trace = self.reward_function_math(second_responses[0], correct[0], True)
@@ -1527,7 +1527,7 @@ class SCoReTrainer:
 
                     try:
                         # Generate first attempt
-                        first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.7)
+                        first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.4)
                         first = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                         first_trace = self.reward_function_math(first[0], correct[0], True)
                         first = [first.split("assistant", 1)[-1] for first in first]
@@ -1544,7 +1544,7 @@ class SCoReTrainer:
                             truncation=True,
                             max_length=self.config.max_seq_len
                         ).to(self.config.device)
-                        second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=0.7)
+                        second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=0.4)
                         second = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
                         second_trace = self.reward_function_math(second[0], correct[0], True)
                     
