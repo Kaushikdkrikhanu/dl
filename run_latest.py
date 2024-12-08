@@ -1527,7 +1527,7 @@ class SCoReTrainer:
 
                     try:
                         # Generate first attempt
-                        first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.4)
+                        first_ids = self.model.generate_text(encodings, max_length=self.config.max_seq_len, temperature=0.0)
                         first = self.model.tokenizer.batch_decode(first_ids, skip_special_tokens=True)
                         first_trace = self.reward_function_math(first[0], correct[0], True)
                         first = [first.split("assistant", 1)[-1] for first in first]
@@ -1544,7 +1544,7 @@ class SCoReTrainer:
                             truncation=True,
                             max_length=self.config.max_seq_len
                         ).to(self.config.device)
-                        second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=0.4)
+                        second_ids = self.model.generate_text(second_encodings, max_length=self.config.max_seq_len, temperature=0.0)
                         second = self.model.tokenizer.batch_decode(second_ids, skip_special_tokens=True)
                         second_trace = self.reward_function_math(second[0], correct[0], True)
                     
