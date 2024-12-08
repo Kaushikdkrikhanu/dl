@@ -109,15 +109,15 @@ class Config:
     ablation: str = 'none'
     data_path: str = './data'
     output_dir: str = './outputs'
-    num_workers: int = 2
-    gradient_accumulation_steps: int = 1
+    num_workers: int = 8
+    gradient_accumulation_steps: int = 8
     max_grad_norm: float = 1.0
     warmup_steps: int = 100
     save_steps: int = 1000
-    logging_steps: int = 10
-    eval_steps: int = 1000
+    logging_steps: int = 50
+    eval_steps: int = 500
     max_eval_samples: int = 500
-    mixed_precision: bool = False
+    mixed_precision: bool = True
     save_total_limit: int = 2
 
     def validate(self) -> None:
@@ -195,6 +195,7 @@ class BaseDataset(Dataset):
     def __init__(self, data: List[Dict[str, Any]], task: str = 'MATH'):
         self.data = data
         self.task = task
+        self.formatted_prompts = [self.prepare_prompt(item) for item in data]
 
     def __len__(self) -> int:
         return len(self.data)
@@ -222,7 +223,7 @@ class BaseDataset(Dataset):
         try:
             item = self.data[idx]
             # Format prompt for first turn
-            item['formatted_prompt'] = self.prepare_prompt(item)
+            item['formatted_prompt'] = self.formatted_prompts[idx]
             return item
         except IndexError as e:
             logger.error(f"Index {idx} out of range for dataset of size {len(self.data)}.")
@@ -1720,14 +1721,18 @@ def main():
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
-            shuffle=False,
-            num_workers=config.num_workers
+            shuffle=True,
+            num_workers=config.num_workers,
+            persistent_workers=True,
+            prefetch_factor=2
         )
         val_loader = DataLoader(
             val_dataset,
             batch_size=config.batch_size,
-            shuffle=False,
-            num_workers=config.num_workers
+            shuffle=True,
+            num_workers=config.num_workers,
+            persistent_workers=True,
+            prefetch_factor=2
         )
         logger.info("Datasets loaded successfully.")
     except Exception as e:
