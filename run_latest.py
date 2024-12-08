@@ -1087,10 +1087,25 @@ class SCoReTrainer:
                 logger.info(f"Starting Stage I Training - Epoch {epoch + 1}")
                 self.stage_one()
                 # logger.info("EVALUATING AFTER STAGE ONE")
-                # self.evaluate()
+                # evaluate and save after odd epochs
+                if (epoch + 1) % 2 == 0:
+                    avg_reward = self.evaluate()  # Get validation metrics
+                    is_best = avg_reward > self.best_reward
+                    if is_best:
+                        self.best_reward = avg_reward
+                    self.save_checkpoint(epoch, stage=1, is_best=is_best)
+            
             for epoch in range(self.config.num_epochs_stage_two):
                 logger.info(f"Starting Stage II Training - Epoch {epoch + 1}")
                 self.stage_two()
+                # evaluate and save after odd epochs
+                if (epoch + 1) % 2 == 0:
+                    avg_reward = self.evaluate()  # Get validation metrics
+                    is_best = avg_reward > self.best_reward
+                    if is_best:
+                        self.best_reward = avg_reward
+                    self.save_checkpoint(epoch, stage=2, is_best=is_best)
+            
             logger.info("Training completed successfully.")
         except Exception as e:
             logger.error(f"Error during training: {e}")
@@ -1109,28 +1124,16 @@ class SCoReTrainer:
                 'best_reward': self.best_reward
             }
             
-            # Save regular checkpoint
-            checkpoint_path = os.path.join(
-                self.config.output_dir, 
-                f'checkpoint_stage{stage}_epoch{epoch}.pt'
-            )
+            # Save latest checkpoint (overwriting previous)
+            checkpoint_path = os.path.join(self.config.output_dir, 'latest_checkpoint.pt')
             torch.save(checkpoint, checkpoint_path)
-            logger.info(f"Saved checkpoint to {checkpoint_path}")
+            logger.info(f"Saved latest checkpoint to {checkpoint_path}")
             
-            # Save best model if this is the best performance
+            # Save best model if this is the best performance (overwriting previous best)
             if is_best:
                 best_path = os.path.join(self.config.output_dir, 'best_model.pt')
                 torch.save(checkpoint, best_path)
                 logger.info(f"Saved best model to {best_path}")
-                
-            # Remove old checkpoints if save_total_limit is reached
-            checkpoints = sorted(
-                [f for f in os.listdir(self.config.output_dir) if f.startswith('checkpoint')],
-                key=lambda x: int(x.split('epoch')[-1].split('.')[0])
-            )
-            if len(checkpoints) > self.config.save_total_limit:
-                for old_ckpt in checkpoints[:-self.config.save_total_limit]:
-                    os.remove(os.path.join(self.config.output_dir, old_ckpt))
                     
         except Exception as e:
             logger.error(f"Error saving checkpoint: {e}")
@@ -1605,6 +1608,14 @@ class SCoReTrainer:
 
             self.plot_reward_history()
             self.plot_edit_distance_ratios()
+
+            avg_reward_t1 = total_correct_t1 / total_samples if total_samples > 0 else 0.0
+            avg_reward_t2 = total_correct_t2 / total_samples if total_samples > 0 else 0.0
+            
+            logger.info(f"Evaluation - Average Reward@t1: {avg_reward_t1:.4f}")
+            logger.info(f"Evaluation - Average Reward@t2: {avg_reward_t2:.4f}")
+            
+            return avg_reward_t2
 
         except Exception as e:
             logger.error(f"Error during evaluation: {e}")
