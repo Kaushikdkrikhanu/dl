@@ -1,4 +1,7 @@
-# To run score:
+# SCoRe (Self-Correction via Reinforcement Learning)
+This is our attempt to implement SCoRe according to google's SCoRe paper.
+
+# To ru.n score:
 
 ## Installation
 pip install -r requirements.txt
